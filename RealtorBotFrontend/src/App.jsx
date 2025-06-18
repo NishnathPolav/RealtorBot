@@ -1,35 +1,44 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import Layout from './components/Layout';
+import LandingPage from './pages/LandingPage';
+import Login from './pages/Login';
+import Signup from './pages/SIgnup';
+import ChooseMode from './pages/ChooseMode';
+import SellerDashboard from './pages/SellerDashboard';
+import AddEditListing from './pages/AddEditListing';
+import RespondOffers from './pages/RespondOffers';
+import BuyerDashboard from './pages/BuyerDashboard';
+import ConversationalSearch from './pages/ConversationalSearch';
+import SuggestedListings from './pages/SuggestedListings';
+import ScheduleTour from './pages/ScheduleTour';
+import OfferNegotiation from './pages/OfferNegotiation';
+import TourScheduler from './pages/TourScheduler';
+import Inspection from './pages/Inspection';
+import Chat from './pages/Chat';
 
-function App() {
-  const [count, setCount] = useState(0)
+const App = () => (
+  <Router>
+    <Layout>
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
+        <Route path="/choose-mode" element={<ChooseMode />} />
+        <Route path="/seller-dashboard" element={<SellerDashboard />} />
+        <Route path="/add-edit-listing" element={<AddEditListing />} />
+        <Route path="/respond-offers" element={<RespondOffers />} />
+        <Route path="/buyer-dashboard" element={<BuyerDashboard />} />
+        <Route path="/conversational-search" element={<ConversationalSearch />} />
+        <Route path="/suggested-listings" element={<SuggestedListings />} />
+        <Route path="/schedule-tour" element={<ScheduleTour />} />
+        <Route path="/offer-negotiation" element={<OfferNegotiation />} />
+        <Route path="/tour-scheduler" element={<TourScheduler />} />
+        <Route path="/inspection" element={<Inspection />} />
+        <Route path="/chat" element={<Chat />} />
+      </Routes>
+    </Layout>
+  </Router>
+);
 
-  return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
-}
-
-export default App
+export default App;
