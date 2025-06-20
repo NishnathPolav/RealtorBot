@@ -12,8 +12,10 @@ const sidebarLinks = [
   { text: 'Chat', to: '/chat' },
 ];
 
+const drawerWidth = 240;
+
 const Sidebar = () => (
-  <Drawer variant="permanent" anchor="left">
+  <Drawer variant="permanent" anchor="left" sx={{ width: drawerWidth, flexShrink: 0, '& .MuiDrawer-paper': { width: drawerWidth, boxSizing: 'border-box' } }}>
     <List>
       {sidebarLinks.map((link) => (
         <ListItem button key={link.text} component={Link} to={link.to}>
