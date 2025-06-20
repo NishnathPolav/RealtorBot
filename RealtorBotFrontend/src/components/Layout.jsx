@@ -9,9 +9,9 @@ const drawerWidth = 240;
 const Layout = ({ children }) => (
   <Box sx={{ display: 'flex', minHeight: '100vh', flexDirection: 'column' }}>
     <Header />
-    <Box sx={{ display: 'flex', flex: 1 }}>
+    <Box sx={{ display: 'flex', flex: 1, gap: 3, background: '#f9fafb' }}>
       <Sidebar />
-      <Box component="main" sx={{ flex: 1, p: 3, marginLeft: `${drawerWidth}px` }}>
+      <Box component="main" sx={{ flex: 1, p: 3, background: '#f9fafb', minHeight: '100vh', borderRadius: 2 }}>
         {children}
       </Box>
     </Box>
