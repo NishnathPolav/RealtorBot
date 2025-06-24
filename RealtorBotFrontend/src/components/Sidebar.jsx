@@ -6,7 +6,7 @@ import ListItemText from '@mui/material/ListItemText';
 import { Link } from 'react-router-dom';
 
 const sidebarLinks = [
-  { text: 'Landing', to: '/' },
+  { text: 'Main Page', to: '/' },
   { text: 'Seller Dashboard', to: '/seller-dashboard' },
   { text: 'Buyer Dashboard', to: '/buyer-dashboard' },
   { text: 'Chat', to: '/chat' },
