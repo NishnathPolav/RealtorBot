@@ -4,16 +4,18 @@ import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
 import Box from '@mui/material/Box';
 import Input from '@mui/material/Input';
+import CircularProgress from '@mui/material/CircularProgress';
 import { useListings } from '../components/ListingsContext';
 import { useNavigate, useParams } from 'react-router-dom';
 
 const AddEditListing = () => {
   const fileInputRef = useRef();
-  const { addListing, editListing, listings } = useListings();
+  const { addListing, editListing, getListing } = useListings();
   const navigate = useNavigate();
   const { id } = useParams();
   const isEdit = Boolean(id);
-  const existing = isEdit ? listings.find(l => l.id === Number(id)) : null;
+  const [loading, setLoading] = useState(isEdit);
+  const [error, setError] = useState(null);
   const [form, setForm] = useState({
     title: '',
     address: '',
@@ -23,16 +25,29 @@ const AddEditListing = () => {
   });
 
   useEffect(() => {
-    if (isEdit && existing) {
-      setForm({
-        title: existing.title || '',
-        address: existing.address || '',
-        price: existing.price || '',
-        description: existing.description || '',
-        photo: null,
-      });
-    }
-  }, [isEdit, existing]);
+    const fetchListing = async () => {
+      if (isEdit && id) {
+        try {
+          setLoading(true);
+          const listing = await getListing(id);
+          setForm({
+            title: listing.title || '',
+            address: listing.address || '',
+            price: listing.price || '',
+            description: listing.description || '',
+            photo: null,
+          });
+        } catch (error) {
+          console.error('Failed to fetch listing:', error);
+          setError(error.message);
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchListing();
+  }, [isEdit, id, getListing]);
 
   const handleChange = (e) => {
     const { name, value, files } = e.target;
@@ -42,19 +57,45 @@ const AddEditListing = () => {
     }));
   };
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
-    if (isEdit) {
-      editListing(existing.id, form);
-    } else {
-      addListing(form);
+    try {
+      if (isEdit) {
+        await editListing(id, form);
+      } else {
+        await addListing(form);
+      }
+      navigate('/seller-dashboard');
+    } catch (error) {
+      console.error('Failed to save listing:', error);
+      setError(error.message);
     }
-    navigate('/seller-dashboard');
   };
 
   const handleCancel = () => {
     navigate('/seller-dashboard');
   };
+
+  if (loading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box maxWidth={500} mx="auto" mt={8} p={3} boxShadow={3} borderRadius={2}>
+        <Typography variant="h6" color="error" gutterBottom>
+          Error: {error}
+        </Typography>
+        <Button variant="outlined" onClick={handleCancel}>
+          Back to Dashboard
+        </Button>
+      </Box>
+    );
+  }
 
   return (
     <Box maxWidth={500} mx="auto" mt={8} p={3} boxShadow={3} borderRadius={2}>
@@ -110,7 +151,7 @@ const AddEditListing = () => {
         </Box>
         <Box display="flex" justifyContent="space-between" mt={3}>
           <Button variant="contained" color="primary" type="submit">
-            Save
+            {isEdit ? 'Update' : 'Save'}
           </Button>
           <Button variant="outlined" color="secondary" onClick={handleCancel}>
             Cancel
