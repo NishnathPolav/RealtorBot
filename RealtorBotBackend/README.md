@@ -127,3 +127,5 @@ Enable debug logging by setting `NODE_ENV=development` in your environment varia
 ## License
 
 This project is for educational purposes. Implement proper security measures before using in production. 
+
+...
