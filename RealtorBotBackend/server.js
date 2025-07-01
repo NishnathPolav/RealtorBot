@@ -8,10 +8,11 @@ const authRoutes = require('./routes/auth');
 const propertyRoutes = require('./routes/properties');
 const userRoutes = require('./routes/users');
 const tourRoutes = require('./routes/tours');
+const conversationalRoutes = require('./routes/conversational');
 const watsonDiscovery = require('./services/watsonDiscovery');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 
 // Middleware
 app.use(helmet());
@@ -84,6 +85,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/properties', propertyRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/tours', tourRoutes);
+app.use('/api/conversational', conversationalRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

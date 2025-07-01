@@ -19,6 +19,10 @@ const SellerDashboard = () => {
     navigate('/add-edit-listing');
   };
 
+  const handleConversationalAI = () => {
+    navigate('/conversational-search');
+  };
+
   const handleViewListing = (id) => {
     console.log('Viewing listing with ID:', { id, type: typeof id });
     navigate(`/listing/${id}`);
@@ -44,9 +48,14 @@ const SellerDashboard = () => {
         </Typography>
       )}
 
-      <Button variant="contained" color="primary" sx={{ mb: 2 }} onClick={handleAddListing}>
-        Add New Listing
-      </Button>
+      <Box sx={{ mb: 3 }}>
+        <Button variant="contained" color="primary" sx={{ mr: 2 }} onClick={handleAddListing}>
+          Add New Listing
+        </Button>
+        <Button variant="contained" color="secondary" onClick={handleConversationalAI}>
+          AI Assistant - Create Listing
+        </Button>
+      </Box>
       
       <Typography variant="h6" gutterBottom>
         Your Active Listings ({listings.length})
@@ -56,7 +65,7 @@ const SellerDashboard = () => {
         <Card sx={{ mb: 2 }}>
           <CardContent>
             <Typography variant="body1" color="text.secondary">
-              You haven't created any listings yet. Click "Add New Listing" to get started!
+              You haven't created any listings yet. Click "Add New Listing" or use our AI Assistant to get started!
             </Typography>
           </CardContent>
         </Card>

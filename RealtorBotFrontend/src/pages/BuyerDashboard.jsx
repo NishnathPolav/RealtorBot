@@ -71,13 +71,11 @@ const BuyerDashboard = () => {
         </Typography>
       )}
 
-      <Button variant="contained" color="primary" sx={{ mb: 2 }}>
-        Start Conversational Search
-      </Button>
-      
-      <Button variant="contained" color="secondary" sx={{ mb: 2, ml: 2 }} onClick={handleScheduleTour}>
-        Schedule New Tour
-      </Button>
+      <Box sx={{ mb: 3 }}>
+        <Button variant="contained" color="secondary" onClick={handleScheduleTour}>
+          Schedule New Tour
+        </Button>
+      </Box>
       
       <Typography variant="h6" gutterBottom>
         Suggested Listings
