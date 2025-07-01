@@ -18,6 +18,8 @@ import Inspection from './pages/Inspection';
 import Chat from './pages/Chat';
 import ProtectedRoute from './components/ProtectedRoute';
 import ListingDetails from './pages/ListingDetails';
+import AddEditTour from './pages/AddEditTour';
+import TourDetails from './pages/TourDetails';
 
 const App = () => (
   <Router>
@@ -41,6 +43,9 @@ const App = () => (
         {/*<Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />*/}
         <Route path="/chat" element={<Chat />} />
         <Route path="/listing/:id" element={<ProtectedRoute><ListingDetails /></ProtectedRoute>} />
+        <Route path="/add-edit-tour" element={<ProtectedRoute><AddEditTour /></ProtectedRoute>} />
+        <Route path="/add-edit-tour/:id" element={<ProtectedRoute><AddEditTour /></ProtectedRoute>} />
+        <Route path="/tour/:id" element={<ProtectedRoute><TourDetails /></ProtectedRoute>} />
       </Routes>
     </Layout>
   </Router>

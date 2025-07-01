@@ -7,6 +7,7 @@ require('dotenv').config({ path: './config.env' });
 const authRoutes = require('./routes/auth');
 const propertyRoutes = require('./routes/properties');
 const userRoutes = require('./routes/users');
+const tourRoutes = require('./routes/tours');
 const watsonDiscovery = require('./services/watsonDiscovery');
 
 const app = express();
@@ -53,16 +54,19 @@ app.get('/test-watson', async (req, res) => {
     console.log('Creating collections...');
     const usersCollection = await watsonDiscovery.createCollection(process.env.USERS_COLLECTION);
     const propertiesCollection = await watsonDiscovery.createCollection(process.env.PROPERTIES_COLLECTION);
+    const toursCollection = await watsonDiscovery.createCollection(process.env.TOURS_COLLECTION);
     
     console.log('Users collection result:', usersCollection);
     console.log('Properties collection result:', propertiesCollection);
+    console.log('Tours collection result:', toursCollection);
     
     res.json({
       message: 'Watsonx Discovery test completed',
       connection: connectionTest.success,
       collections: {
         users: usersCollection.success,
-        properties: propertiesCollection.success
+        properties: propertiesCollection.success,
+        tours: toursCollection.success
       }
     });
     
@@ -79,6 +83,7 @@ app.get('/test-watson', async (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/properties', propertyRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/tours', tourRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

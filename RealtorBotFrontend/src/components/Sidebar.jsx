@@ -9,6 +9,7 @@ const sidebarLinks = [
   { text: 'Main Page', to: '/' },
   { text: 'Seller Dashboard', to: '/seller-dashboard' },
   { text: 'Buyer Dashboard', to: '/buyer-dashboard' },
+  { text: 'Schedule Tour', to: '/add-edit-tour' },
   { text: 'Chat', to: '/chat' },
 ];
 

@@ -138,6 +138,47 @@ export const propertiesAPI = {
   },
 };
 
+// Tours API
+export const toursAPI = {
+  getMyTours: async () => {
+    console.log('API: getMyTours called');
+    try {
+      // Add timestamp to prevent caching
+      const timestamp = Date.now();
+      const response = await apiRequest(`/tours/buyer/my-tours?t=${timestamp}`);
+      console.log('API: getMyTours response:', response);
+      return response;
+    } catch (error) {
+      console.error('API: getMyTours failed:', error);
+      throw error;
+    }
+  },
+
+  getById: async (id) => {
+    return await apiRequest(`/tours/${id}`);
+  },
+
+  create: async (tourData) => {
+    return await apiRequest('/tours', {
+      method: 'POST',
+      body: JSON.stringify(tourData),
+    });
+  },
+
+  update: async (id, updates) => {
+    return await apiRequest(`/tours/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    });
+  },
+
+  delete: async (id) => {
+    return await apiRequest(`/tours/${id}`, {
+      method: 'DELETE',
+    });
+  },
+};
+
 // Users API
 export const usersAPI = {
   getProfile: async () => {
