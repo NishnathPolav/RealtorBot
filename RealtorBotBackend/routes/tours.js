@@ -60,7 +60,10 @@ router.get('/buyer/my-tours', verifyToken, async (req, res) => {
 
     const tours = response.data.hits.hits.map(hit => ({
       id: hit._source.id,
-      property_address: hit._source.property_address,
+      street: hit._source.street,
+      city: hit._source.city,
+      state: hit._source.state,
+      zip: hit._source.zip,
       scheduled_date: hit._source.scheduled_date,
       scheduled_time: hit._source.scheduled_time,
       status: hit._source.status,
@@ -106,11 +109,14 @@ router.get('/:id', verifyToken, async (req, res) => {
       return res.status(403).json({ error: 'Not authorized to view this tour' });
     }
 
-    console.log('Tour found:', { id: tour.id, property_address: tour.property_address });
+    console.log('Tour found:', { id: tour.id, street: tour.street, city: tour.city, state: tour.state, zip: tour.zip });
 
     res.json({
       id: tour.id,
-      property_address: tour.property_address,
+      street: tour.street,
+      city: tour.city,
+      state: tour.state,
+      zip: tour.zip,
       scheduled_date: tour.scheduled_date,
       scheduled_time: tour.scheduled_time,
       status: tour.status,
@@ -129,18 +135,21 @@ router.get('/:id', verifyToken, async (req, res) => {
 // Create new tour (requires authentication)
 router.post('/', verifyToken, async (req, res) => {
   try {
-    const { property_address, scheduled_date, scheduled_time, notes = '' } = req.body;
-    console.log('Create tour attempt:', { property_address, scheduled_date, scheduled_time, buyer_id: req.user.id });
+    const { street, city, state, zip, scheduled_date, scheduled_time, notes = '' } = req.body;
+    console.log('Create tour attempt:', { street, city, state, zip, scheduled_date, scheduled_time, buyer_id: req.user.id });
 
-    if (!property_address || !scheduled_date || !scheduled_time) {
-      console.log('Missing required fields:', { property_address: !!property_address, scheduled_date: !!scheduled_date, scheduled_time: !!scheduled_time });
-      return res.status(400).json({ error: 'Property address, scheduled date, and scheduled time are required' });
+    if (!street || !city || !state || !zip || !scheduled_date || !scheduled_time) {
+      console.log('Missing required fields:', { street: !!street, city: !!city, state: !!state, zip: !!zip, scheduled_date: !!scheduled_date, scheduled_time: !!scheduled_time });
+      return res.status(400).json({ error: 'Street, city, state, zip, scheduled date, and scheduled time are required' });
     }
 
     // Create tour document
     const newTour = {
       id: Date.now().toString(),
-      property_address,
+      street,
+      city,
+      state,
+      zip,
       scheduled_date,
       scheduled_time,
       notes,
@@ -150,7 +159,7 @@ router.post('/', verifyToken, async (req, res) => {
       updated_at: new Date().toISOString()
     };
 
-    console.log('Creating new tour:', { id: newTour.id, property_address: newTour.property_address });
+    console.log('Creating new tour:', { id: newTour.id, street: newTour.street, city: newTour.city, state: newTour.state, zip: newTour.zip });
 
     // Index tour in Watsonx Discovery
     const result = await watsonDiscovery.indexDocument(
@@ -165,13 +174,16 @@ router.post('/', verifyToken, async (req, res) => {
       return res.status(500).json({ error: 'Failed to create tour' });
     }
 
-    console.log('Tour created successfully:', { id: newTour.id, property_address: newTour.property_address });
+    console.log('Tour created successfully:', { id: newTour.id, street: newTour.street, city: newTour.city, state: newTour.state, zip: newTour.zip });
 
     res.status(201).json({
       message: 'Tour scheduled successfully',
       tour: {
         id: newTour.id,
-        property_address: newTour.property_address,
+        street: newTour.street,
+        city: newTour.city,
+        state: newTour.state,
+        zip: newTour.zip,
         scheduled_date: newTour.scheduled_date,
         scheduled_time: newTour.scheduled_time,
         status: newTour.status,
@@ -232,7 +244,10 @@ router.put('/:id', verifyToken, async (req, res) => {
       message: 'Tour updated successfully',
       tour: {
         id: updatedTour.id,
-        property_address: updatedTour.property_address,
+        street: updatedTour.street,
+        city: updatedTour.city,
+        state: updatedTour.state,
+        zip: updatedTour.zip,
         scheduled_date: updatedTour.scheduled_date,
         scheduled_time: updatedTour.scheduled_time,
         status: updatedTour.status,

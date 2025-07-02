@@ -7,6 +7,11 @@ import Input from '@mui/material/Input';
 import CircularProgress from '@mui/material/CircularProgress';
 import { useListings } from '../components/ListingsContext';
 import { useNavigate, useParams } from 'react-router-dom';
+import MenuItem from '@mui/material/MenuItem';
+
+const US_STATES = [
+  'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY'
+];
 
 const AddEditListing = () => {
   const fileInputRef = useRef();
@@ -18,7 +23,10 @@ const AddEditListing = () => {
   const [error, setError] = useState(null);
   const [form, setForm] = useState({
     title: '',
-    address: '',
+    street: '',
+    city: '',
+    state: '',
+    zip: '',
     price: '',
     description: '',
     photo: null,
@@ -32,7 +40,10 @@ const AddEditListing = () => {
           const listing = await getListing(id);
           setForm({
             title: listing.title || '',
-            address: listing.address || '',
+            street: listing.street || '',
+            city: listing.city || '',
+            state: listing.state || '',
+            zip: listing.zip || '',
             price: listing.price || '',
             description: listing.description || '',
             photo: null,
@@ -111,9 +122,41 @@ const AddEditListing = () => {
           required
         />
         <TextField
-          label="Address"
-          name="address"
-          value={form.address}
+          label="Street Address"
+          name="street"
+          value={form.street}
+          onChange={handleChange}
+          fullWidth
+          margin="normal"
+          required
+        />
+        <TextField
+          label="City"
+          name="city"
+          value={form.city}
+          onChange={handleChange}
+          fullWidth
+          margin="normal"
+          required
+        />
+        <TextField
+          label="State"
+          name="state"
+          value={form.state}
+          onChange={handleChange}
+          fullWidth
+          margin="normal"
+          required
+          select
+        >
+          {US_STATES.map((state) => (
+            <MenuItem key={state} value={state}>{state}</MenuItem>
+          ))}
+        </TextField>
+        <TextField
+          label="Zip Code"
+          name="zip"
+          value={form.zip}
           onChange={handleChange}
           fullWidth
           margin="normal"

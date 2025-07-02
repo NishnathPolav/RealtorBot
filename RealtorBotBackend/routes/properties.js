@@ -61,10 +61,13 @@ router.get('/', async (req, res) => {
       return res.status(500).json({ error: 'Failed to fetch properties' });
     }
 
-    const properties = result.data.hits.hits.map(hit => ({
+    const properties = result.data.hits.hits.hits.map(hit => ({
       id: hit._source.id,
       title: hit._source.title,
-      address: hit._source.address,
+      street: hit._source.street,
+      city: hit._source.city,
+      state: hit._source.state,
+      zip: hit._source.zip,
       price: hit._source.price,
       description: hit._source.description,
       status: hit._source.status,
@@ -109,7 +112,10 @@ router.get('/:id', async (req, res) => {
     res.json({
       id: property.id,
       title: property.title,
-      address: property.address,
+      street: property.street,
+      city: property.city,
+      state: property.state,
+      zip: property.zip,
       price: property.price,
       description: property.description,
       status: property.status,
@@ -128,19 +134,22 @@ router.get('/:id', async (req, res) => {
 // Create new property (requires authentication)
 router.post('/', verifyToken, async (req, res) => {
   try {
-    const { title, address, price, description, features = [] } = req.body;
-    console.log('Create property attempt:', { title, address, price, seller_id: req.user.id });
+    const { title, street, city, state, zip, price, description, features = [] } = req.body;
+    console.log('Create property attempt:', { title, street, city, state, zip, price, seller_id: req.user.id });
 
-    if (!title || !address || !price) {
-      console.log('Missing required fields:', { title: !!title, address: !!address, price: !!price });
-      return res.status(400).json({ error: 'Title, address, and price are required' });
+    if (!title || !street || !city || !state || !zip || !price) {
+      console.log('Missing required fields:', { title: !!title, street: !!street, city: !!city, state: !!state, zip: !!zip, price: !!price });
+      return res.status(400).json({ error: 'Title, street, city, state, zip, and price are required' });
     }
 
     // Create property document
     const newProperty = {
       id: Date.now().toString(),
       title,
-      address,
+      street,
+      city,
+      state,
+      zip,
       price: parseInt(price),
       description: description || '',
       features,
@@ -172,7 +181,10 @@ router.post('/', verifyToken, async (req, res) => {
       property: {
         id: newProperty.id,
         title: newProperty.title,
-        address: newProperty.address,
+        street: newProperty.street,
+        city: newProperty.city,
+        state: newProperty.state,
+        zip: newProperty.zip,
         price: newProperty.price,
         description: newProperty.description,
         status: newProperty.status,
@@ -323,7 +335,10 @@ router.get('/seller/my-properties', verifyToken, async (req, res) => {
     const properties = response.data.hits.hits.map(hit => ({
       id: hit._source.id,
       title: hit._source.title,
-      address: hit._source.address,
+      street: hit._source.street,
+      city: hit._source.city,
+      state: hit._source.state,
+      zip: hit._source.zip,
       price: hit._source.price,
       description: hit._source.description,
       status: hit._source.status,

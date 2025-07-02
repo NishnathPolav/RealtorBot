@@ -114,7 +114,7 @@ const TourDetails = () => {
             Property Address
           </Typography>
           <Typography variant="body1" gutterBottom sx={{ mb: 2 }}>
-            {tour.property_address}
+            {[tour.street, tour.city, tour.state, tour.zip].filter(Boolean).join(', ')}
           </Typography>
 
           <Typography variant="h6" gutterBottom>

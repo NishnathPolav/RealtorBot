@@ -126,7 +126,9 @@ const BuyerDashboard = () => {
               >
                 <CardContent>
                   <Box display="flex" justifyContent="space-between" alignItems="center">
-                    <Typography variant="subtitle1">{tour.property_address}</Typography>
+                    <Typography variant="subtitle1">
+                      {[tour.street, tour.city, tour.state, tour.zip].filter(Boolean).join(', ')}
+                    </Typography>
                     <Chip 
                       label={tour.status} 
                       color={getStatusColor(tour.status)}

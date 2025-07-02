@@ -75,7 +75,7 @@ const ListingDetails = () => {
         <CardContent>
           <Typography variant="h4" gutterBottom>{listing.title}</Typography>
           <Typography variant="subtitle1" gutterBottom>Status: {listing.status}</Typography>
-          <Typography variant="body1" gutterBottom>Address: {listing.address}</Typography>
+          <Typography variant="body1" gutterBottom>Address: {[listing.street, listing.city, listing.state, listing.zip].filter(Boolean).join(', ')}</Typography>
           <Typography variant="body1" gutterBottom>Price: ${listing.price}</Typography>
           <Typography variant="body1" gutterBottom>Description: {listing.description}</Typography>
           {listing.features && listing.features.length > 0 && (

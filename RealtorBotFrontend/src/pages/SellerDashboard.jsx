@@ -80,7 +80,7 @@ const SellerDashboard = () => {
                 <CardContent>
                   <Typography variant="subtitle1">{listing.title}</Typography>
                   <Typography variant="body2" color="text.secondary">
-                    Address: {listing.address}
+                    Address: {[listing.street, listing.city, listing.state, listing.zip].filter(Boolean).join(', ')}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     Price: ${listing.price?.toLocaleString()}
