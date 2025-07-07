@@ -8,6 +8,10 @@ import CircularProgress from '@mui/material/CircularProgress';
 import { useTours } from '../components/ToursContext';
 import { useNavigate, useParams } from 'react-router-dom';
 
+const US_STATES = [
+  'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY'
+];
+
 const AddEditTour = () => {
   const { addTour, editTour, getTour } = useTours();
   const navigate = useNavigate();
@@ -16,7 +20,10 @@ const AddEditTour = () => {
   const [loading, setLoading] = useState(isEdit);
   const [error, setError] = useState(null);
   const [form, setForm] = useState({
-    property_address: '',
+    street: '',
+    city: '',
+    state: '',
+    zip: '',
     scheduled_date: '',
     scheduled_time: '',
     notes: '',
@@ -37,7 +44,10 @@ const AddEditTour = () => {
           setLoading(true);
           const tour = await getTour(id);
           setForm({
-            property_address: tour.property_address || '',
+            street: tour.street || '',
+            city: tour.city || '',
+            state: tour.state || '',
+            zip: tour.zip || '',
             scheduled_date: tour.scheduled_date || '',
             scheduled_time: tour.scheduled_time || '',
             notes: tour.notes || '',
@@ -109,14 +119,45 @@ const AddEditTour = () => {
       </Typography>
       <form onSubmit={handleSave}>
         <TextField
-          label="Property Address"
-          name="property_address"
-          value={form.property_address}
+          label="Street Address"
+          name="street"
+          value={form.street}
           onChange={handleChange}
           fullWidth
           margin="normal"
           required
-          placeholder="Enter the full property address"
+        />
+        <TextField
+          label="City"
+          name="city"
+          value={form.city}
+          onChange={handleChange}
+          fullWidth
+          margin="normal"
+          required
+        />
+        <TextField
+          label="State"
+          name="state"
+          value={form.state}
+          onChange={handleChange}
+          fullWidth
+          margin="normal"
+          required
+          select
+        >
+          {US_STATES.map((state) => (
+            <MenuItem key={state} value={state}>{state}</MenuItem>
+          ))}
+        </TextField>
+        <TextField
+          label="Zip Code"
+          name="zip"
+          value={form.zip}
+          onChange={handleChange}
+          fullWidth
+          margin="normal"
+          required
         />
         <TextField
           label="Date"

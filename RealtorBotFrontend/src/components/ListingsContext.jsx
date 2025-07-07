@@ -113,7 +113,7 @@ export const ListingsProvider = ({ children }) => {
         const filteredProperties = myProperties.properties.filter(property => {
           const searchLower = search.toLowerCase();
           return property.title.toLowerCase().includes(searchLower) ||
-                 property.address.toLowerCase().includes(searchLower) ||
+                 [property.street, property.city, property.state, property.zip].filter(Boolean).join(', ').toLowerCase().includes(searchLower) ||
                  property.description.toLowerCase().includes(searchLower);
         });
         response = { properties: filteredProperties };
