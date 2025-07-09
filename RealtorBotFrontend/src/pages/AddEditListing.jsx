@@ -27,10 +27,11 @@ const AddEditListing = () => {
     city: '',
     state: '',
     zip: '',
-    price: '',
+    price: '', // Store raw number as string
     description: '',
     photo: null,
   });
+  const [displayPrice, setDisplayPrice] = useState(''); // For formatted price
 
   useEffect(() => {
     const fetchListing = async () => {
@@ -60,21 +61,53 @@ const AddEditListing = () => {
     fetchListing();
   }, [isEdit, id, getListing]);
 
+  const formatPrice = (value) => {
+    if (!value) return '';
+    // Remove all non-digit characters
+    const numeric = value.replace(/[^\d]/g, '');
+    if (!numeric) return '';
+    // Format with commas
+    const withCommas = Number(numeric).toLocaleString();
+    return `$${withCommas}`;
+  };
+
   const handleChange = (e) => {
     const { name, value, files } = e.target;
-    setForm((prev) => ({
-      ...prev,
-      [name]: files ? files[0] : value,
-    }));
+    if (name === 'price') {
+      // Remove all non-digit characters for storage
+      const numeric = value.replace(/[^\d]/g, '');
+      setForm((prev) => ({
+        ...prev,
+        price: numeric,
+      }));
+      setDisplayPrice(formatPrice(value));
+    } else {
+      setForm((prev) => ({
+        ...prev,
+        [name]: files ? files[0] : value,
+      }));
+    }
   };
+
+  useEffect(() => {
+    // When loading a listing for edit, format the price for display
+    if (isEdit && form.price !== undefined && form.price !== null) {
+      setDisplayPrice(formatPrice(form.price.toString()));
+    }
+    // eslint-disable-next-line
+  }, [form.price, isEdit]);
 
   const handleSave = async (e) => {
     e.preventDefault();
     try {
+      const listingData = {
+        ...form,
+        price: form.price ? Number(form.price) : '', // Ensure price is a number
+      };
       if (isEdit) {
-        await editListing(id, form);
+        await editListing(id, listingData);
       } else {
-        await addListing(form);
+        await addListing(listingData);
       }
       navigate('/seller-dashboard');
     } catch (error) {
@@ -165,8 +198,8 @@ const AddEditListing = () => {
         <TextField
           label="Price"
           name="price"
-          type="number"
-          value={form.price}
+          type="text"
+          value={displayPrice}
           onChange={handleChange}
           fullWidth
           margin="normal"

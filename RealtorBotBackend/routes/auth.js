@@ -1,5 +1,6 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcrypt'); // Added for password hashing
 const watsonDiscovery = require('../services/watsonDiscovery');
 
 const router = express.Router();
@@ -77,11 +78,15 @@ router.post('/register', async (req, res) => {
       }
     }
 
+    // Hash the password before storing
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
     // Create new user document
     const newUser = {
       id: Date.now().toString(),
       email: email.toLowerCase(), // Normalize email to lowercase
-      password, // In production, hash this password
+      password: hashedPassword, // Store hashed password
       role,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
@@ -127,7 +132,7 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    console.log('Login attempt:', { email, password, passwordType: typeof password });
+    console.log('Login attempt:', { email, password: password ? '[REDACTED]' : undefined, passwordType: typeof password });
 
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required' });
@@ -154,20 +159,12 @@ router.post('/login', async (req, res) => {
     console.log('Found user:', { 
       id: user.id, 
       email: user.email, 
-      role: user.role,
-      storedPassword: user.password,
-      storedPasswordType: typeof user.password,
-      inputPassword: password,
-      inputPasswordType: typeof password
+      role: user.role
     });
 
-    // In production, verify password hash here
-    const passwordMatch = user.password === password;
-    console.log('Password comparison:', {
-      stored: `"${user.password}" (${typeof user.password})`,
-      input: `"${password}" (${typeof password})`,
-      match: passwordMatch
-    });
+    // Compare hashed password
+    const passwordMatch = await bcrypt.compare(password, user.password);
+    console.log('Password comparison:', { match: passwordMatch });
 
     if (!passwordMatch) {
       console.log('Password mismatch');

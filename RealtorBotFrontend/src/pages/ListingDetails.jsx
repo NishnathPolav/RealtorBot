@@ -48,6 +48,14 @@ const ListingDetails = () => {
     }
   };
 
+  // Helper to format price with commas and dollar sign
+  const formatPrice = (price) => {
+    if (price === undefined || price === null || price === '') return '';
+    const num = Number(price);
+    if (isNaN(num)) return price;
+    return `$${num.toLocaleString()}`;
+  };
+
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
@@ -76,7 +84,7 @@ const ListingDetails = () => {
           <Typography variant="h4" gutterBottom>{listing.title}</Typography>
           <Typography variant="subtitle1" gutterBottom>Status: {listing.status}</Typography>
           <Typography variant="body1" gutterBottom>Address: {[listing.street, listing.city, listing.state, listing.zip].filter(Boolean).join(', ')}</Typography>
-          <Typography variant="body1" gutterBottom>Price: ${listing.price}</Typography>
+          <Typography variant="body1" gutterBottom>Price: {formatPrice(listing.price)}</Typography>
           <Typography variant="body1" gutterBottom>Description: {listing.description}</Typography>
           {listing.features && listing.features.length > 0 && (
             <Typography variant="body1" gutterBottom>
