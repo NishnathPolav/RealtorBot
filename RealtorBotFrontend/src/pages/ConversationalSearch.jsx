@@ -38,6 +38,10 @@ const ConversationalSearch = () => {
   const isBuyer = user?.role === 'buyer';
   const isSeller = user?.role === 'seller';
 
+  console.log('ConversationalSearch component loaded');
+  console.log('User:', user);
+  console.log('isBuyer:', isBuyer, 'isSeller:', isSeller);
+
   // Auto-scroll to bottom when new messages arrive
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -49,7 +53,9 @@ const ConversationalSearch = () => {
 
   // Initialize conversation based on user role
   useEffect(() => {
+    console.log('Initializing conversation for user role:', user?.role);
     if (isBuyer) {
+      console.log('Setting up buyer conversation');
       setMessages([
         {
           id: 1,
@@ -60,6 +66,7 @@ const ConversationalSearch = () => {
       ]);
       setConversationState('budget');
     } else if (isSeller) {
+      console.log('Setting up seller conversation');
       setMessages([
         {
           id: 1,
@@ -69,6 +76,8 @@ const ConversationalSearch = () => {
         }
       ]);
       setConversationState('property_type');
+    } else {
+      console.log('No user role detected, cannot initialize conversation');
     }
   }, [isBuyer, isSeller]);
 
@@ -108,13 +117,28 @@ const ConversationalSearch = () => {
   const sellerQuestions = {
     property_type: {
       question: "What type of property are you selling?",
-      nextState: 'address',
+      nextState: 'street',
       field: 'propertyType'
     },
-    address: {
-      question: "What's the property address?",
+    street: {
+      question: "What's the street address?",
+      nextState: 'city',
+      field: 'street'
+    },
+    city: {
+      question: "What city is the property in?",
+      nextState: 'state',
+      field: 'city'
+    },
+    state: {
+      question: "What state is the property in? (e.g., NY, CA)",
+      nextState: 'zip',
+      field: 'state'
+    },
+    zip: {
+      question: "What's the ZIP code?",
       nextState: 'price',
-      field: 'address'
+      field: 'zip'
     },
     price: {
       question: "What's your asking price?",
@@ -146,6 +170,8 @@ const ConversationalSearch = () => {
   const handleSendMessage = async () => {
     if (!inputMessage.trim()) return;
 
+    console.log('handleSendMessage called with:', inputMessage);
+
     const userMessage = {
       id: Date.now(),
       type: 'user',
@@ -161,6 +187,7 @@ const ConversationalSearch = () => {
     // Simulate AI processing delay
     setTimeout(async () => {
       try {
+        console.log('About to call processUserResponse');
         await processUserResponse(inputMessage);
       } catch (error) {
         console.error('Error processing user response:', error);
@@ -180,10 +207,18 @@ const ConversationalSearch = () => {
   };
 
   const processUserResponse = async (response) => {
+    console.log('processUserResponse called with:', response);
+    console.log('User role:', user?.role);
+    console.log('isBuyer:', isBuyer, 'isSeller:', isSeller);
+    
     if (isBuyer) {
+      console.log('Processing as buyer');
       await processBuyerResponse(response);
     } else if (isSeller) {
+      console.log('Processing as seller');
       await processSellerResponse(response);
+    } else {
+      console.log('No user role detected');
     }
   };
 
@@ -233,18 +268,22 @@ const ConversationalSearch = () => {
 
   const processSellerResponse = async (response) => {
     const currentQuestion = sellerQuestions[conversationState];
-    
-    // Store property detail
-    setPropertyDetails(prev => ({
-      ...prev,
-      [currentQuestion.field]: response
-    }));
+
+    // Build the latest property details synchronously
+    let latestPropertyDetails = propertyDetails;
+    if (currentQuestion) {
+      latestPropertyDetails = {
+        ...propertyDetails,
+        [currentQuestion.field]: response
+      };
+      setPropertyDetails(latestPropertyDetails); // keep state in sync
+    }
 
     if (conversationState === 'complete') {
-      // Create listing via API
+      // This should not happen in normal flow, but handle it just in case
       try {
-        const result = await createListingFromConversation(propertyDetails);
-        
+        const result = await createListingFromConversation(latestPropertyDetails);
+
         const botMessage = {
           id: Date.now(),
           type: 'bot',
@@ -255,22 +294,57 @@ const ConversationalSearch = () => {
         setMessages(prev => [...prev, botMessage]);
         setConversationState('listing_created');
       } catch (error) {
-        console.error('Error creating listing:', error);
-        throw error;
+        const botMessage = {
+          id: Date.now(),
+          type: 'bot',
+          content: `Sorry, I couldn't create the listing: ${error.message}. Please try again or contact support.`,
+          timestamp: new Date()
+        };
+        setMessages(prev => [...prev, botMessage]);
+        setConversationState('initial');
       }
-    } else {
+    } else if (currentQuestion) {
       const nextState = currentQuestion.nextState;
-      const nextQuestion = sellerQuestions[nextState];
       
-      const botMessage = {
-        id: Date.now(),
-        type: 'bot',
-        content: nextQuestion.question,
-        timestamp: new Date()
-      };
+      if (nextState === 'complete') {
+        // This is the last question, create the listing
+        try {
+          const result = await createListingFromConversation(latestPropertyDetails);
 
-      setMessages(prev => [...prev, botMessage]);
-      setConversationState(nextState);
+          const botMessage = {
+            id: Date.now(),
+            type: 'bot',
+            content: `Perfect! I've created a listing for your property. Here are the details: ${result.property.title} at ${result.property.address} for ${result.property.price}`,
+            timestamp: new Date()
+          };
+
+          setMessages(prev => [...prev, botMessage]);
+          setConversationState('listing_created');
+        } catch (error) {
+          const botMessage = {
+            id: Date.now(),
+            type: 'bot',
+            content: `Sorry, I couldn't create the listing: ${error.message}. Please try again or contact support.`,
+            timestamp: new Date()
+          };
+          setMessages(prev => [...prev, botMessage]);
+          setConversationState('initial');
+        }
+      } else if (sellerQuestions[nextState]) {
+        const nextQuestion = sellerQuestions[nextState];
+
+        const botMessage = {
+          id: Date.now(),
+          type: 'bot',
+          content: nextQuestion.question,
+          timestamp: new Date()
+        };
+
+        setMessages(prev => [...prev, botMessage]);
+        setConversationState(nextState);
+      } else {
+        setConversationState(nextState);
+      }
     }
   };
 

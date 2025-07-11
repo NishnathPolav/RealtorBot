@@ -133,7 +133,10 @@ router.post('/create-listing', verifyToken, async (req, res) => {
   try {
     const { 
       propertyType, 
-      address, 
+      street, 
+      city, 
+      state, 
+      zip, 
       price, 
       bedrooms, 
       bathrooms, 
@@ -143,13 +146,16 @@ router.post('/create-listing', verifyToken, async (req, res) => {
 
     console.log('Create listing from conversation:', {
       user_id: req.user.id,
-      property_details: { propertyType, address, price, bedrooms, bathrooms, squareFootage }
+      property_details: { propertyType, street, city, state, zip, price, bedrooms, bathrooms, squareFootage }
     });
 
+    // Build address string
+    const address = [street, city, state, zip].filter(Boolean).join(', ');
+
     // Validate required fields
-    if (!propertyType || !address || !price) {
+    if (!propertyType || !street || !city || !state || !zip || !price) {
       return res.status(400).json({ 
-        error: 'Property type, address, and price are required' 
+        error: 'Property type, street, city, state, zip, and price are required' 
       });
     }
 
@@ -165,6 +171,10 @@ router.post('/create-listing', verifyToken, async (req, res) => {
       title: `${propertyType} at ${address}`,
       propertyType: propertyType.toLowerCase(),
       address,
+      street,
+      city,
+      state,
+      zip,
       price: cleanPrice,
       bedrooms: parseInt(bedrooms) || 0,
       bathrooms: parseInt(bathrooms) || 0,
