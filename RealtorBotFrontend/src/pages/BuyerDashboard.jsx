@@ -10,16 +10,13 @@ import { useNavigate } from 'react-router-dom';
 import { useTours } from '../components/ToursContext';
 import { useAuth } from '../components/AuthContext';
 import Chip from '@mui/material/Chip';
-
-const mockSuggestions = [
-  { id: 1, title: '789 Pine Rd', price: '$500,000' },
-  { id: 2, title: '321 Maple Ln', price: '$420,000' },
-];
+import { useListings } from '../components/ListingsContext';
 
 const BuyerDashboard = () => {
   const navigate = useNavigate();
-  const { tours, loading } = useTours();
+  const { tours, loading: toursLoading } = useTours();
   const { user } = useAuth();
+  const { listings, loading: listingsLoading } = useListings();
 
   const handleScheduleTour = () => {
     navigate('/add-edit-tour');
@@ -27,6 +24,10 @@ const BuyerDashboard = () => {
 
   const handleViewTour = (id) => {
     navigate(`/tour/${id}`);
+  };
+
+  const handleViewListing = (id) => {
+    navigate(`/listing/${id}`);
   };
 
   const formatDate = (dateString) => {
@@ -51,10 +52,10 @@ const BuyerDashboard = () => {
     }
   };
 
-  if (loading) {
+  if (toursLoading || listingsLoading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-        <Typography>Loading your tours...</Typography>
+        <Typography>Loading your dashboard...</Typography>
       </Box>
     );
   }
@@ -71,26 +72,52 @@ const BuyerDashboard = () => {
         </Typography>
       )}
 
-      <Box sx={{ mb: 3 }}>
+      {/* Remove the Schedule New Tour button from the top */}
+      {/* <Box sx={{ mb: 3 }}>
         <Button variant="contained" color="secondary" onClick={handleScheduleTour}>
           Schedule New Tour
         </Button>
-      </Box>
+      </Box> */}
       
       <Typography variant="h6" gutterBottom>
-        Suggested Listings
+        All Available Listings
       </Typography>
       <List>
-        {mockSuggestions.map(listing => (
-          <ListItem key={listing.id}>
-            <Card sx={{ width: '100%' }}>
-              <CardContent>
-                <Typography variant="subtitle1">{listing.title}</Typography>
-                <Typography variant="body2" color="text.secondary">Price: {listing.price}</Typography>
-              </CardContent>
-            </Card>
+        {listings.length === 0 ? (
+          <ListItem>
+            <Typography variant="body1" color="text.secondary">
+              No properties available at the moment.
+            </Typography>
           </ListItem>
-        ))}
+        ) : (
+          listings.map(listing => (
+            <ListItem key={listing.id} disablePadding sx={{ mb: 2 }}>
+              <Card
+                sx={{
+                  width: '100%',
+                  cursor: 'pointer',
+                  transition: 'box-shadow 0.2s, background 0.2s',
+                  '&:hover': {
+                    boxShadow: 8,
+                    background: '#f0f4ff',
+                  },
+                }}
+                elevation={3}
+                onClick={() => handleViewListing(listing.id)}
+              >
+                <CardContent>
+                  <Typography variant="subtitle1">{listing.title}</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Address: {[listing.street, listing.city, listing.state, listing.zip].filter(Boolean).join(', ') || listing.address}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Price: ${listing.price?.toLocaleString()}
+                  </Typography>
+                </CardContent>
+              </Card>
+            </ListItem>
+          ))
+        )}
       </List>
       
       <Typography variant="h6" gutterBottom sx={{ mt: 3 }}>
@@ -101,7 +128,7 @@ const BuyerDashboard = () => {
         <Card sx={{ mb: 2 }}>
           <CardContent>
             <Typography variant="body1" color="text.secondary">
-              You haven't scheduled any tours yet. Click "Schedule New Tour" to get started!
+              You haven't scheduled any tours yet.
             </Typography>
           </CardContent>
         </Card>

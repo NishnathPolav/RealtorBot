@@ -61,7 +61,7 @@ router.get('/', async (req, res) => {
       return res.status(500).json({ error: 'Failed to fetch properties' });
     }
 
-    const properties = result.data.hits.hits.hits.map(hit => ({
+    const properties = result.data.hits.hits.map(hit => ({
       id: hit._source.id,
       title: hit._source.title,
       street: hit._source.street,

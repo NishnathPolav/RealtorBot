@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 import Box from '@mui/material/Box';
@@ -9,11 +9,31 @@ import ListItem from '@mui/material/ListItem';
 import { useNavigate } from 'react-router-dom';
 import { useListings } from '../components/ListingsContext';
 import { useAuth } from '../components/AuthContext';
+import { toursAPI } from '../services/api';
 
 const SellerDashboard = () => {
   const navigate = useNavigate();
   const { listings, loading } = useListings();
   const { user } = useAuth();
+  const [tours, setTours] = useState([]);
+  const [toursLoading, setToursLoading] = useState(true);
+  const [toursError, setToursError] = useState(null);
+
+  useEffect(() => {
+    const fetchTours = async () => {
+      setToursLoading(true);
+      setToursError(null);
+      try {
+        const response = await toursAPI.getSellerTours();
+        setTours(response.tours || []);
+      } catch (err) {
+        setToursError('Failed to load upcoming tours.');
+      } finally {
+        setToursLoading(false);
+      }
+    };
+    fetchTours();
+  }, []);
 
   const handleAddListing = () => {
     navigate('/add-edit-listing');
@@ -119,14 +139,59 @@ const SellerDashboard = () => {
       <Typography variant="h6" gutterBottom>
         Upcoming Tours
       </Typography>
-      {/* Placeholder for tours */}
-      <Card>
-        <CardContent>
-          <Typography variant="body2" color="text.secondary">
-            No upcoming tours.
-          </Typography>
-        </CardContent>
-      </Card>
+      {toursLoading ? (
+        <Card>
+          <CardContent>
+            <Typography variant="body2" color="text.secondary">
+              Loading upcoming tours...
+            </Typography>
+          </CardContent>
+        </Card>
+      ) : toursError ? (
+        <Card>
+          <CardContent>
+            <Typography variant="body2" color="error">
+              {toursError}
+            </Typography>
+          </CardContent>
+        </Card>
+      ) : tours.length === 0 ? (
+        <Card>
+          <CardContent>
+            <Typography variant="body2" color="text.secondary">
+              No upcoming tours.
+            </Typography>
+          </CardContent>
+        </Card>
+      ) : (
+        <List>
+          {tours.map(tour => (
+            <ListItem key={tour.id} disablePadding sx={{ mb: 2 }}>
+              <Card sx={{ width: '100%' }} elevation={2}>
+                <CardContent>
+                  <Typography variant="subtitle1">
+                    {tour.street}, {tour.city}, {tour.state} {tour.zip}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Date: {tour.scheduled_date} &nbsp; Time: {tour.scheduled_time}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Buyer ID: {tour.buyer_id}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Status: {tour.status}
+                  </Typography>
+                  {tour.notes && (
+                    <Typography variant="body2" color="text.secondary">
+                      Notes: {tour.notes}
+                    </Typography>
+                  )}
+                </CardContent>
+              </Card>
+            </ListItem>
+          ))}
+        </List>
+      )}
     </Box>
   );
 };
