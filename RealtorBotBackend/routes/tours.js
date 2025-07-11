@@ -84,6 +84,55 @@ router.get('/buyer/my-tours', verifyToken, async (req, res) => {
   }
 });
 
+// Get all tours for a seller's properties (requires authentication)
+router.get('/seller/my-tours', verifyToken, async (req, res) => {
+  try {
+    const { page = 1, size = 10 } = req.query;
+    const sellerId = req.user.id;
+    // Fetch tours where seller_id matches
+    const searchBody = {
+      query: {
+        bool: {
+          must: [
+            { match_all: {} }
+          ],
+          filter: [
+            { term: { seller_id: sellerId } }
+          ]
+        }
+      },
+      sort: [ { 'scheduled_date': { order: 'asc' } } ],
+      size: parseInt(size),
+      from: (parseInt(page) - 1) * parseInt(size)
+    };
+    const toursResponse = await watsonDiscovery.client.post(
+      `/${process.env.TOURS_COLLECTION}/_search`,
+      searchBody
+    );
+    const tours = toursResponse.data.hits.hits.map(hit => ({
+      id: hit._source.id,
+      property_id: hit._source.property_id,
+      street: hit._source.street,
+      city: hit._source.city,
+      state: hit._source.state,
+      zip: hit._source.zip,
+      scheduled_date: hit._source.scheduled_date,
+      scheduled_time: hit._source.scheduled_time,
+      status: hit._source.status,
+      notes: hit._source.notes,
+      buyer_id: hit._source.buyer_id,
+      created_at: hit._source.created_at
+    }));
+    res.json({
+      tours,
+      total: toursResponse.data.hits.total.value
+    });
+  } catch (error) {
+    console.error('Get seller tours error:', error);
+    res.status(500).json({ error: 'Failed to fetch seller tours' });
+  }
+});
+
 // Get tour by ID
 router.get('/:id', verifyToken, async (req, res) => {
   try {
@@ -135,21 +184,34 @@ router.get('/:id', verifyToken, async (req, res) => {
 // Create new tour (requires authentication)
 router.post('/', verifyToken, async (req, res) => {
   try {
-    const { street, city, state, zip, scheduled_date, scheduled_time, notes = '' } = req.body;
-    console.log('Create tour attempt:', { street, city, state, zip, scheduled_date, scheduled_time, buyer_id: req.user.id });
+    const { property_id, seller_id, scheduled_date, scheduled_time, notes = '' } = req.body;
+    console.log('Create tour attempt:', { property_id, seller_id, scheduled_date, scheduled_time, buyer_id: req.user.id });
 
-    if (!street || !city || !state || !zip || !scheduled_date || !scheduled_time) {
-      console.log('Missing required fields:', { street: !!street, city: !!city, state: !!state, zip: !!zip, scheduled_date: !!scheduled_date, scheduled_time: !!scheduled_time });
-      return res.status(400).json({ error: 'Street, city, state, zip, scheduled date, and scheduled time are required' });
+    if (!property_id || !seller_id || !scheduled_date || !scheduled_time) {
+      return res.status(400).json({ error: 'Property ID, seller ID, scheduled date, and scheduled time are required' });
     }
 
+    // Fetch property by ID
+    const propertyResult = await watsonDiscovery.getDocument(
+      process.env.PROPERTIES_COLLECTION,
+      property_id
+    );
+    if (!propertyResult.success) {
+      return res.status(400).json({ error: 'Property not found' });
+    }
+    const property = propertyResult.data._source;
+    if (property.seller_id !== seller_id) {
+      return res.status(400).json({ error: 'Seller ID does not match property owner' });
+    }
     // Create tour document
     const newTour = {
       id: Date.now().toString(),
-      street,
-      city,
-      state,
-      zip,
+      property_id,
+      seller_id,
+      street: property.street,
+      city: property.city,
+      state: property.state,
+      zip: property.zip,
       scheduled_date,
       scheduled_time,
       notes,
@@ -158,40 +220,19 @@ router.post('/', verifyToken, async (req, res) => {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
-
-    console.log('Creating new tour:', { id: newTour.id, street: newTour.street, city: newTour.city, state: newTour.state, zip: newTour.zip });
-
+    console.log('Creating new tour:', { id: newTour.id, property_id: newTour.property_id, seller_id: newTour.seller_id });
     // Index tour in Watsonx Discovery
     const result = await watsonDiscovery.indexDocument(
       process.env.TOURS_COLLECTION,
       newTour
     );
-
-    console.log('Index tour result:', result);
-
     if (!result.success) {
-      console.error('Failed to create tour in Watsonx Discovery:', result.error);
       return res.status(500).json({ error: 'Failed to create tour' });
     }
-
-    console.log('Tour created successfully:', { id: newTour.id, street: newTour.street, city: newTour.city, state: newTour.state, zip: newTour.zip });
-
     res.status(201).json({
       message: 'Tour scheduled successfully',
-      tour: {
-        id: newTour.id,
-        street: newTour.street,
-        city: newTour.city,
-        state: newTour.state,
-        zip: newTour.zip,
-        scheduled_date: newTour.scheduled_date,
-        scheduled_time: newTour.scheduled_time,
-        status: newTour.status,
-        notes: newTour.notes,
-        buyer_id: newTour.buyer_id
-      }
+      tour: newTour
     });
-
   } catch (error) {
     console.error('Create tour error:', error);
     res.status(500).json({ error: 'Failed to schedule tour', details: error.message });

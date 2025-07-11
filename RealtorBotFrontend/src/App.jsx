@@ -20,6 +20,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import ListingDetails from './pages/ListingDetails';
 import AddEditTour from './pages/AddEditTour';
 import TourDetails from './pages/TourDetails';
+import Calendar from './pages/Calendar';
 
 const App = () => (
   <Router>
@@ -29,11 +30,11 @@ const App = () => (
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/choose-mode" element={<ProtectedRoute><ChooseMode /></ProtectedRoute>} />
-        <Route path="/seller-dashboard" element={<ProtectedRoute><SellerDashboard /></ProtectedRoute>} />
+        <Route path="/seller-dashboard" element={<ProtectedRoute allowedRoles={['seller']}><SellerDashboard /></ProtectedRoute>} />
         <Route path="/add-edit-listing" element={<ProtectedRoute><AddEditListing /></ProtectedRoute>} />
         <Route path="/add-edit-listing/:id" element={<ProtectedRoute><AddEditListing /></ProtectedRoute>} />
         <Route path="/respond-offers" element={<ProtectedRoute><RespondOffers /></ProtectedRoute>} />
-        <Route path="/buyer-dashboard" element={<ProtectedRoute><BuyerDashboard /></ProtectedRoute>} />
+        <Route path="/buyer-dashboard" element={<ProtectedRoute allowedRoles={['buyer']}><BuyerDashboard /></ProtectedRoute>} />
         <Route path="/conversational-search" element={<ProtectedRoute><ConversationalSearch /></ProtectedRoute>} />
         <Route path="/suggested-listings" element={<ProtectedRoute><SuggestedListings /></ProtectedRoute>} />
         <Route path="/schedule-tour" element={<ProtectedRoute><ScheduleTour /></ProtectedRoute>} />
@@ -46,6 +47,7 @@ const App = () => (
         <Route path="/add-edit-tour" element={<ProtectedRoute><AddEditTour /></ProtectedRoute>} />
         <Route path="/add-edit-tour/:id" element={<ProtectedRoute><AddEditTour /></ProtectedRoute>} />
         <Route path="/tour/:id" element={<ProtectedRoute><TourDetails /></ProtectedRoute>} />
+        <Route path="/calendar" element={<ProtectedRoute><Calendar /></ProtectedRoute>} />
       </Routes>
     </Layout>
   </Router>

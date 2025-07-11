@@ -154,6 +154,20 @@ export const toursAPI = {
     }
   },
 
+  getSellerTours: async () => {
+    console.log('API: getSellerTours called');
+    try {
+      // Add timestamp to prevent caching
+      const timestamp = Date.now();
+      const response = await apiRequest(`/tours/seller/my-tours?t=${timestamp}`);
+      console.log('API: getSellerTours response:', response);
+      return response;
+    } catch (error) {
+      console.error('API: getSellerTours failed:', error);
+      throw error;
+    }
+  },
+
   getById: async (id) => {
     return await apiRequest(`/tours/${id}`);
   },

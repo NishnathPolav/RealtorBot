@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useListings } from '../components/ListingsContext';
+import { useAuth } from '../components/AuthContext';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -15,6 +16,7 @@ const ListingDetails = () => {
   const [listing, setListing] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const { user } = useAuth();
 
   useEffect(() => {
     const fetchListing = async () => {
@@ -48,6 +50,10 @@ const ListingDetails = () => {
     }
   };
 
+  const handleScheduleTour = () => {
+    navigate(`/calendar?propertyId=${listing.id}`);
+  };
+
   // Helper to format price with commas and dollar sign
   const formatPrice = (price) => {
     if (price === undefined || price === null || price === '') return '';
@@ -55,6 +61,11 @@ const ListingDetails = () => {
     if (isNaN(num)) return price;
     return `$${num.toLocaleString()}`;
   };
+
+  // Only show edit/delete if seller and owner
+  const canEditOrDelete = user && user.role === 'seller' && listing && listing.seller_id === user.id;
+  // Show schedule tour if not the owner
+  const canScheduleTour = user && (!canEditOrDelete);
 
   if (loading) {
     return (
@@ -94,12 +105,21 @@ const ListingDetails = () => {
         </CardContent>
       </Card>
       <Box display="flex" gap={2} mt={2}>
-        <Button variant="contained" color="primary" onClick={handleEdit}>
-          Edit
-        </Button>
-        <Button variant="outlined" color="error" onClick={handleDelete}>
-          Delete
-        </Button>
+        {canEditOrDelete && (
+          <>
+            <Button variant="contained" color="primary" onClick={handleEdit}>
+              Edit
+            </Button>
+            <Button variant="outlined" color="error" onClick={handleDelete}>
+              Delete
+            </Button>
+          </>
+        )}
+        {canScheduleTour && (
+          <Button variant="contained" color="secondary" onClick={handleScheduleTour}>
+            Schedule Tour
+          </Button>
+        )}
         <Button variant="outlined" onClick={() => navigate(-1)}>
           Back
         </Button>
