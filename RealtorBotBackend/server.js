@@ -53,9 +53,9 @@ app.get('/test-watson', async (req, res) => {
     
     // Try to create collections if they don't exist
     console.log('Creating collections...');
-    const usersCollection = await watsonDiscovery.createCollection(process.env.USERS_COLLECTION);
+    const usersCollection = await watsonDiscovery.ensureUsersCollection();
     const propertiesCollection = await watsonDiscovery.createCollection(process.env.PROPERTIES_COLLECTION);
-    const toursCollection = await watsonDiscovery.createCollection(process.env.TOURS_COLLECTION);
+    const toursCollection = await watsonDiscovery.ensureToursCollection();
     
     console.log('Users collection result:', usersCollection);
     console.log('Properties collection result:', propertiesCollection);

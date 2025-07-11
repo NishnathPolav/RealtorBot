@@ -268,6 +268,54 @@ class WatsonDiscoveryService {
       return { success: false, error: error.message };
     }
   }
+
+  // Ensure tours collection exists with proper mappings
+  async ensureToursCollection() {
+    try {
+      console.log('Ensuring tours collection exists...');
+      
+      // First, try to get the existing collection to check if it exists
+      try {
+        const existingCollection = await this.client.get('/tours');
+        console.log('Tours collection already exists');
+        return { success: true, data: existingCollection.data, exists: true };
+      } catch (error) {
+        if (error.response && error.response.status === 404) {
+          // Collection doesn't exist, create it
+          console.log('Tours collection does not exist, creating...');
+        } else {
+          // Some other error, re-throw
+          throw error;
+        }
+      }
+      
+      // Create new collection with proper mapping
+      const response = await this.client.put(`/tours`, {
+        mappings: {
+          properties: {
+            id: { type: 'keyword' },
+            street: { type: 'text' },
+            city: { type: 'text' },
+            state: { type: 'keyword' },
+            zip: { type: 'keyword' },
+            scheduled_date: { type: 'date' },
+            scheduled_time: { type: 'keyword' },
+            notes: { type: 'text' },
+            status: { type: 'keyword' },
+            buyer_id: { type: 'keyword' },
+            created_at: { type: 'date' },
+            updated_at: { type: 'date' }
+          }
+        }
+      });
+      
+      console.log('Tours collection created successfully');
+      return { success: true, data: response.data, exists: false };
+    } catch (error) {
+      console.error('Ensure tours collection failed:', error.message);
+      return { success: false, error: error.message };
+    }
+  }
 }
 
 module.exports = new WatsonDiscoveryService(); 

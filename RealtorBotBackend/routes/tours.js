@@ -26,6 +26,18 @@ router.get('/buyer/my-tours', verifyToken, async (req, res) => {
   try {
     const { page = 1, size = 10 } = req.query;
     console.log('Fetching tours for buyer:', req.user.id);
+    console.log('User object from token:', req.user);
+
+    // Ensure tours collection exists
+    console.log('Ensuring tours collection exists...');
+    const collectionResult = await watsonDiscovery.ensureToursCollection();
+    console.log('Tours collection ensure result:', collectionResult);
+    
+    // Continue even if collection already exists (that's fine)
+    if (!collectionResult.success && !collectionResult.exists) {
+      console.error('Failed to ensure tours collection exists');
+      return res.status(500).json({ error: 'Failed to initialize tour system' });
+    }
 
     // Search for tours by buyer_id
     const searchBody = {
@@ -137,10 +149,22 @@ router.post('/', verifyToken, async (req, res) => {
   try {
     const { street, city, state, zip, scheduled_date, scheduled_time, notes = '' } = req.body;
     console.log('Create tour attempt:', { street, city, state, zip, scheduled_date, scheduled_time, buyer_id: req.user.id });
+    console.log('User object from token:', req.user);
 
     if (!street || !city || !state || !zip || !scheduled_date || !scheduled_time) {
       console.log('Missing required fields:', { street: !!street, city: !!city, state: !!state, zip: !!zip, scheduled_date: !!scheduled_date, scheduled_time: !!scheduled_time });
       return res.status(400).json({ error: 'Street, city, state, zip, scheduled date, and scheduled time are required' });
+    }
+
+    // Ensure tours collection exists
+    console.log('Ensuring tours collection exists...');
+    const collectionResult = await watsonDiscovery.ensureToursCollection();
+    console.log('Tours collection ensure result:', collectionResult);
+    
+    // Continue even if collection already exists (that's fine)
+    if (!collectionResult.success && !collectionResult.exists) {
+      console.error('Failed to ensure tours collection exists');
+      return res.status(500).json({ error: 'Failed to initialize tour system' });
     }
 
     // Create tour document
@@ -301,6 +325,101 @@ router.delete('/:id', verifyToken, async (req, res) => {
   } catch (error) {
     console.error('Delete tour error:', error);
     res.status(500).json({ error: 'Failed to delete tour' });
+  }
+});
+
+// Test endpoint to check tours collection
+router.get('/test', async (req, res) => {
+  try {
+    console.log('Testing tours collection...');
+    
+    // Ensure tours collection exists
+    const collectionResult = await watsonDiscovery.ensureToursCollection();
+    console.log('Tours collection test result:', collectionResult);
+    
+    // Try to search for any tours
+    const searchBody = {
+      query: {
+        match_all: {}
+      },
+      size: 1
+    };
+    
+    const response = await watsonDiscovery.client.post(
+      `/${process.env.TOURS_COLLECTION}/_search`,
+      searchBody
+    );
+    
+    console.log('Tours search test result:', {
+      total: response.data.hits.total.value,
+      hits: response.data.hits.hits.length
+    });
+    
+    res.json({
+      message: 'Tours collection test completed',
+      collection: collectionResult.success,
+      totalTours: response.data.hits.total.value
+    });
+    
+  } catch (error) {
+    console.error('Tours test error:', error);
+    res.status(500).json({ 
+      error: 'Tours test failed',
+      details: error.message
+    });
+  }
+});
+
+// Test endpoint to create a sample tour
+router.post('/test-create', async (req, res) => {
+  try {
+    console.log('Creating test tour...');
+    
+    // Ensure tours collection exists
+    const collectionResult = await watsonDiscovery.ensureToursCollection();
+    console.log('Tours collection ensure result:', collectionResult);
+    
+    // Create a test tour
+    const testTour = {
+      id: Date.now().toString(),
+      street: '123 Test Street',
+      city: 'Test City',
+      state: 'CA',
+      zip: '12345',
+      scheduled_date: '2024-01-15',
+      scheduled_time: '2:00 PM',
+      notes: 'This is a test tour',
+      status: 'scheduled',
+      buyer_id: 'test-buyer-id',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    
+    console.log('Creating test tour:', testTour);
+    
+    // Index tour in Watsonx Discovery
+    const result = await watsonDiscovery.indexDocument(
+      process.env.TOURS_COLLECTION,
+      testTour
+    );
+    
+    console.log('Test tour creation result:', result);
+    
+    if (!result.success) {
+      return res.status(500).json({ error: 'Failed to create test tour' });
+    }
+    
+    res.json({
+      message: 'Test tour created successfully',
+      tour: testTour
+    });
+    
+  } catch (error) {
+    console.error('Test tour creation error:', error);
+    res.status(500).json({ 
+      error: 'Test tour creation failed',
+      details: error.message
+    });
   }
 });
 

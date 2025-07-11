@@ -15,6 +15,7 @@ export const ToursProvider = ({ children }) => {
   // Load tours on mount and when user changes
   useEffect(() => {
     console.log('ToursContext: User changed:', user);
+    console.log('ToursContext: User role:', user?.role);
     if (user && user.role === 'buyer') {
       console.log('ToursContext: Loading tours for buyer:', user.email);
       loadTours();
@@ -26,6 +27,7 @@ export const ToursProvider = ({ children }) => {
 
   const loadTours = async () => {
     console.log('ToursContext: loadTours called');
+    console.log('ToursContext: Current user:', user);
     setLoading(true);
     setError(null);
     try {
