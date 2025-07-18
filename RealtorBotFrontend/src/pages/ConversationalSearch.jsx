@@ -21,6 +21,7 @@ import { Send as SendIcon, Person as PersonIcon, SmartToy as BotIcon } from '@mu
 import { useAuth } from '../components/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { getPropertyRecommendations, createListingFromConversation } from '../services/conversationalAPI';
+import { createAssistantSession, sendAssistantMessage, deleteAssistantSession } from '../services/assistantAPI';
 
 const ConversationalSearch = () => {
   const { user } = useAuth();
@@ -28,9 +29,7 @@ const ConversationalSearch = () => {
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const [conversationState, setConversationState] = useState('initial');
-  const [userPreferences, setUserPreferences] = useState({});
-  const [propertyDetails, setPropertyDetails] = useState({});
+  const [sessionId, setSessionId] = useState(null);
   const [suggestedProperties, setSuggestedProperties] = useState([]);
   const [error, setError] = useState(null);
   const messagesEndRef = useRef(null);
@@ -51,120 +50,88 @@ const ConversationalSearch = () => {
     scrollToBottom();
   }, [messages]);
 
-  // Initialize conversation based on user role
+  // Initialize conversation with Watsonx Assistant
   useEffect(() => {
-    console.log('Initializing conversation for user role:', user?.role);
-    if (isBuyer) {
-      console.log('Setting up buyer conversation');
-      setMessages([
-        {
-          id: 1,
-          type: 'bot',
-          content: `Hello! I'm your AI real estate assistant. I'll help you find your perfect home by asking a few questions. Let's start with the basics - what's your budget range?`,
-          timestamp: new Date()
+    const initializeAssistant = async () => {
+      try {
+        console.log('Initializing Watsonx Assistant session...');
+        
+        // Create a new assistant session
+        const sessionResult = await createAssistantSession();
+        setSessionId(sessionResult.sessionId);
+        
+        // Send initial message based on user role
+        let initialMessage = '';
+        if (isBuyer) {
+          initialMessage = "Hello! I'm a buyer looking for properties. Can you help me find my perfect home?";
+        } else if (isSeller) {
+          initialMessage = "Hello! I'm a seller looking to create a property listing. Can you help me with that?";
+        } else {
+          initialMessage = "Hello! I'm here to help with real estate. What can I assist you with today?";
         }
-      ]);
-      setConversationState('budget');
-    } else if (isSeller) {
-      console.log('Setting up seller conversation');
-      setMessages([
-        {
-          id: 1,
+        
+        // Send initial message to assistant
+        const response = await sendAssistantMessage(initialMessage, sessionResult.sessionId);
+        
+        // Add assistant's response to messages
+        const botMessage = {
+          id: Date.now(),
           type: 'bot',
-          content: `Hello! I'm your AI real estate assistant. I'll help you create a listing for your property. Let's start with the property details. What type of property are you selling? (house, apartment, condo, etc.)`,
+          content: response.response,
           timestamp: new Date()
+        };
+        
+        setMessages([botMessage]);
+        
+        // Handle any actions from the assistant
+        if (response.actions && response.actions.length > 0) {
+          handleAssistantActions(response.actions);
         }
-      ]);
-      setConversationState('property_type');
-    } else {
-      console.log('No user role detected, cannot initialize conversation');
+        
+      } catch (error) {
+        console.error('Error initializing assistant:', error);
+        setError('Failed to initialize AI assistant. Please try again.');
+        
+        // Fallback to basic welcome message
+        setMessages([
+          {
+            id: 1,
+            type: 'bot',
+            content: `Hello! I'm your AI real estate assistant. How can I help you today?`,
+            timestamp: new Date()
+          }
+        ]);
+      }
+    };
+    
+    if (user) {
+      initializeAssistant();
     }
-  }, [isBuyer, isSeller]);
+    
+    // Cleanup function to delete session when component unmounts
+    return () => {
+      if (sessionId) {
+        deleteAssistantSession(sessionId).catch(console.error);
+      }
+    };
+  }, [user, isBuyer, isSeller]);
 
-  const buyerQuestions = {
-    budget: {
-      question: "What's your budget range?",
-      nextState: 'location',
-      field: 'budget'
-    },
-    location: {
-      question: "What area or neighborhood are you interested in?",
-      nextState: 'bedrooms',
-      field: 'location'
-    },
-    bedrooms: {
-      question: "How many bedrooms do you need?",
-      nextState: 'bathrooms',
-      field: 'bedrooms'
-    },
-    bathrooms: {
-      question: "How many bathrooms do you need?",
-      nextState: 'features',
-      field: 'bathrooms'
-    },
-    features: {
-      question: "Any specific features you're looking for? (e.g., garage, garden, pool, etc.)",
-      nextState: 'timeline',
-      field: 'features'
-    },
-    timeline: {
-      question: "What's your timeline for buying? (immediate, 3 months, 6 months, etc.)",
-      nextState: 'complete',
-      field: 'timeline'
-    }
-  };
-
-  const sellerQuestions = {
-    property_type: {
-      question: "What type of property are you selling?",
-      nextState: 'street',
-      field: 'propertyType'
-    },
-    street: {
-      question: "What's the street address?",
-      nextState: 'city',
-      field: 'street'
-    },
-    city: {
-      question: "What city is the property in?",
-      nextState: 'state',
-      field: 'city'
-    },
-    state: {
-      question: "What state is the property in? (e.g., NY, CA)",
-      nextState: 'zip',
-      field: 'state'
-    },
-    zip: {
-      question: "What's the ZIP code?",
-      nextState: 'price',
-      field: 'zip'
-    },
-    price: {
-      question: "What's your asking price?",
-      nextState: 'bedrooms',
-      field: 'price'
-    },
-    bedrooms: {
-      question: "How many bedrooms?",
-      nextState: 'bathrooms',
-      field: 'bedrooms'
-    },
-    bathrooms: {
-      question: "How many bathrooms?",
-      nextState: 'sqft',
-      field: 'bathrooms'
-    },
-    sqft: {
-      question: "What's the square footage?",
-      nextState: 'description',
-      field: 'squareFootage'
-    },
-    description: {
-      question: "Describe your property (features, condition, etc.)",
-      nextState: 'complete',
-      field: 'description'
-    }
+  // Handle assistant actions (like search results or listing creation)
+  const handleAssistantActions = (actions) => {
+    actions.forEach(action => {
+      if (action.action === 'search_properties' && action.result.success) {
+        setSuggestedProperties(action.result.properties || []);
+      } else if (action.action === 'create_listing' && action.result.success) {
+        // Show success message for listing creation
+        const successMessage = {
+          id: Date.now(),
+          type: 'bot',
+          content: `Great! I've successfully created your listing: ${action.result.property.title} at ${action.result.property.address} for ${action.result.property.price}`,
+          timestamp: new Date()
+        };
+        setMessages(prev => [...prev, successMessage]);
+      }
+    });
   };
 
   const handleSendMessage = async () => {
@@ -184,11 +151,27 @@ const ConversationalSearch = () => {
     setIsTyping(true);
     setError(null);
 
-    // Simulate AI processing delay
+    // Send message to Watsonx Assistant
     setTimeout(async () => {
       try {
-        console.log('About to call processUserResponse');
-        await processUserResponse(inputMessage);
+        console.log('Sending message to Watsonx Assistant:', inputMessage);
+        const response = await sendAssistantMessage(inputMessage, sessionId);
+        
+        // Add assistant's response to messages
+        const botMessage = {
+          id: Date.now(),
+          type: 'bot',
+          content: response.response,
+          timestamp: new Date()
+        };
+        
+        setMessages(prev => [...prev, botMessage]);
+        
+        // Handle any actions from the assistant
+        if (response.actions && response.actions.length > 0) {
+          handleAssistantActions(response.actions);
+        }
+        
       } catch (error) {
         console.error('Error processing user response:', error);
         setError(error.message);
@@ -206,147 +189,7 @@ const ConversationalSearch = () => {
     }, 1000);
   };
 
-  const processUserResponse = async (response) => {
-    console.log('processUserResponse called with:', response);
-    console.log('User role:', user?.role);
-    console.log('isBuyer:', isBuyer, 'isSeller:', isSeller);
-    
-    if (isBuyer) {
-      console.log('Processing as buyer');
-      await processBuyerResponse(response);
-    } else if (isSeller) {
-      console.log('Processing as seller');
-      await processSellerResponse(response);
-    } else {
-      console.log('No user role detected');
-    }
-  };
 
-  const processBuyerResponse = async (response) => {
-    const currentQuestion = buyerQuestions[conversationState];
-    
-    // Store user preference
-    setUserPreferences(prev => ({
-      ...prev,
-      [currentQuestion.field]: response
-    }));
-
-    if (conversationState === 'complete') {
-      // Get property recommendations from API
-      try {
-        const result = await getPropertyRecommendations(userPreferences);
-        setSuggestedProperties(result.properties || []);
-        
-        const botMessage = {
-          id: Date.now(),
-          type: 'bot',
-          content: `Based on your preferences, I found ${result.properties.length} properties that match your criteria:`,
-          timestamp: new Date()
-        };
-
-        setMessages(prev => [...prev, botMessage]);
-        setConversationState('suggestions');
-      } catch (error) {
-        console.error('Error getting recommendations:', error);
-        throw error;
-      }
-    } else {
-      const nextState = currentQuestion.nextState;
-      const nextQuestion = buyerQuestions[nextState];
-      
-      const botMessage = {
-        id: Date.now(),
-        type: 'bot',
-        content: nextQuestion.question,
-        timestamp: new Date()
-      };
-
-      setMessages(prev => [...prev, botMessage]);
-      setConversationState(nextState);
-    }
-  };
-
-  const processSellerResponse = async (response) => {
-    const currentQuestion = sellerQuestions[conversationState];
-
-    // Build the latest property details synchronously
-    let latestPropertyDetails = propertyDetails;
-    if (currentQuestion) {
-      latestPropertyDetails = {
-        ...propertyDetails,
-        [currentQuestion.field]: response
-      };
-      setPropertyDetails(latestPropertyDetails); // keep state in sync
-    }
-
-    if (conversationState === 'complete') {
-      // This should not happen in normal flow, but handle it just in case
-      try {
-        const result = await createListingFromConversation(latestPropertyDetails);
-
-        const botMessage = {
-          id: Date.now(),
-          type: 'bot',
-          content: `Perfect! I've created a listing for your property. Here are the details: ${result.property.title} at ${result.property.address} for ${result.property.price}`,
-          timestamp: new Date()
-        };
-
-        setMessages(prev => [...prev, botMessage]);
-        setConversationState('listing_created');
-      } catch (error) {
-        const botMessage = {
-          id: Date.now(),
-          type: 'bot',
-          content: `Sorry, I couldn't create the listing: ${error.message}. Please try again or contact support.`,
-          timestamp: new Date()
-        };
-        setMessages(prev => [...prev, botMessage]);
-        setConversationState('initial');
-      }
-    } else if (currentQuestion) {
-      const nextState = currentQuestion.nextState;
-      
-      if (nextState === 'complete') {
-        // This is the last question, create the listing
-        try {
-          const result = await createListingFromConversation(latestPropertyDetails);
-
-          const botMessage = {
-            id: Date.now(),
-            type: 'bot',
-            content: `Perfect! I've created a listing for your property. Here are the details: ${result.property.title} at ${result.property.address} for ${result.property.price}`,
-            timestamp: new Date()
-          };
-
-          setMessages(prev => [...prev, botMessage]);
-          setConversationState('listing_created');
-        } catch (error) {
-          const botMessage = {
-            id: Date.now(),
-            type: 'bot',
-            content: `Sorry, I couldn't create the listing: ${error.message}. Please try again or contact support.`,
-            timestamp: new Date()
-          };
-          setMessages(prev => [...prev, botMessage]);
-          setConversationState('initial');
-        }
-      } else if (sellerQuestions[nextState]) {
-        const nextQuestion = sellerQuestions[nextState];
-
-        const botMessage = {
-          id: Date.now(),
-          type: 'bot',
-          content: nextQuestion.question,
-          timestamp: new Date()
-        };
-
-        setMessages(prev => [...prev, botMessage]);
-        setConversationState(nextState);
-      } else {
-        setConversationState(nextState);
-      }
-    }
-  };
 
   const handleViewListing = (listingId) => {
     navigate(`/listing/${listingId}`);
@@ -439,7 +282,7 @@ const ConversationalSearch = () => {
         </Box>
 
         {/* Property Suggestions for Buyers */}
-        {conversationState === 'suggestions' && suggestedProperties.length > 0 && (
+        {suggestedProperties.length > 0 && (
           <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
             <Typography variant="h6" gutterBottom>Suggested Properties</Typography>
             <Grid container spacing={2}>

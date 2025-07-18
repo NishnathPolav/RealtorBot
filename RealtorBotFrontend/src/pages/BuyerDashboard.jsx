@@ -72,12 +72,11 @@ const BuyerDashboard = () => {
         </Typography>
       )}
 
-      {/* Remove the Schedule New Tour button from the top */}
-      {/* <Box sx={{ mb: 3 }}>
-        <Button variant="contained" color="secondary" onClick={handleScheduleTour}>
-          Schedule New Tour
+      <Box sx={{ mb: 3 }}>
+        <Button variant="contained" color="secondary" onClick={() => navigate('/conversational-search')}>
+          Conversational AI Property Search
         </Button>
-      </Box> */}
+      </Box>
       
       <Typography variant="h6" gutterBottom>
         All Available Listings

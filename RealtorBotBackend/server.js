@@ -9,6 +9,7 @@ const propertyRoutes = require('./routes/properties');
 const userRoutes = require('./routes/users');
 const tourRoutes = require('./routes/tours');
 const conversationalRoutes = require('./routes/conversational');
+const assistantRoutes = require('./routes/assistant');
 const watsonDiscovery = require('./services/watsonDiscovery');
 
 const app = express();
@@ -86,6 +87,7 @@ app.use('/api/properties', propertyRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/tours', tourRoutes);
 app.use('/api/conversational', conversationalRoutes);
+app.use('/api/assistant', assistantRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
