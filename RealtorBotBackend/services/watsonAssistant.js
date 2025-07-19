@@ -6,7 +6,7 @@ class WatsonAssistantService {
     this.serviceUrl = process.env.WATSONX_ASSISTANT_URL;
     this.environmentId = process.env.WATSONX_ASSISTANT_ID; // This is your environment ID (Live or Draft)
     this.sessionId = null;
-    this.apiVersion = '2024-10-01';
+    this.apiVersion = '2021-11-27';
   }
 
   // Helper to get auth config for axios
@@ -80,4 +80,4 @@ class WatsonAssistantService {
   }
 }
 
-module.exports = new WatsonAssistantService(); // Test comment for git
+module.exports = new WatsonAssistantService(); 
