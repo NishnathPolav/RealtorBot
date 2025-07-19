@@ -6,7 +6,7 @@ class WatsonAssistantService {
     this.serviceUrl = process.env.WATSONX_ASSISTANT_URL;
     this.environmentId = process.env.WATSONX_ASSISTANT_ID; // This is your environment ID (Live or Draft)
     this.sessionId = null;
-    this.apiVersion = '2021-11-27';
+    this.apiVersion = '2024-10-01';
   }
 
   // Helper to get auth config for axios
@@ -22,7 +22,7 @@ class WatsonAssistantService {
   // Create a new session
   async createSession() {
     try {
-      const url = `${this.serviceUrl.replace(/\/instances\/.+$/, '')}/v2/assistants/${this.environmentId}/sessions?version=${this.apiVersion}`;
+      const url = `${this.serviceUrl}/v2/assistants/${this.environmentId}/sessions?version=${this.apiVersion}`;
       const response = await axios.post(url, {}, this.getAuthConfig());
       this.sessionId = response.data.session_id;
       return { success: true, sessionId: this.sessionId };
@@ -42,7 +42,7 @@ class WatsonAssistantService {
           return sessionResult;
         }
       }
-      const url = `${this.serviceUrl.replace(/\/instances\/.+$/, '')}/v2/assistants/${this.environmentId}/sessions/${sessionToUse}/message?version=${this.apiVersion}`;
+      const url = `${this.serviceUrl}/v2/assistants/${this.environmentId}/sessions/${sessionToUse}/message?version=${this.apiVersion}`;
       const response = await axios.post(
         url,
         {
@@ -69,7 +69,7 @@ class WatsonAssistantService {
     try {
       const sessionToUse = sessionId || this.sessionId;
       if (sessionToUse) {
-        const url = `${this.serviceUrl.replace(/\/instances\/.+$/, '')}/v2/assistants/${this.environmentId}/sessions/${sessionToUse}?version=${this.apiVersion}`;
+        const url = `${this.serviceUrl}/v2/assistants/${this.environmentId}/sessions/${sessionToUse}?version=${this.apiVersion}`;
         await axios.delete(url, this.getAuthConfig());
       }
       return { success: true };
