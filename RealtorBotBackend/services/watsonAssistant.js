@@ -80,4 +80,4 @@ class WatsonAssistantService {
   }
 }
 
-module.exports = new WatsonAssistantService(); 
+module.exports = new WatsonAssistantService(); // Test comment for git
