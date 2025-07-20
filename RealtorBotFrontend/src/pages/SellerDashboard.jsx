@@ -40,7 +40,7 @@ const SellerDashboard = () => {
   };
 
   const handleConversationalAI = () => {
-    navigate('/conversational-search');
+    navigate('/chat');
   };
 
   const handleViewListing = (id) => {

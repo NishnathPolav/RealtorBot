@@ -64,7 +64,9 @@ export const createListingFromConversation = async (propertyDetails) => {
 // Get conversation history (for future enhancement)
 export const getConversationHistory = async () => {
   try {
-    const response = await makeAuthenticatedRequest('/conversational/history');
+    const response = await makeAuthenticatedRequest('/conversational/history', {
+      method: 'GET',
+    });
     return response;
   } catch (error) {
     console.error('Error getting conversation history:', error);

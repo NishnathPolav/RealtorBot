@@ -154,16 +154,37 @@ router.post('/create-listing', verifyToken, async (req, res) => {
 
     // Validate required fields
     if (!propertyType || !street || !city || !state || !zip || !price) {
+      console.error('Missing required fields for listing creation:', {
+        propertyType: !!propertyType,
+        street: !!street,
+        city: !!city,
+        state: !!state,
+        zip: !!zip,
+        price: !!price
+      });
       return res.status(400).json({ 
         error: 'Property type, street, city, state, zip, and price are required' 
       });
     }
 
-    // Clean and validate price
-    const cleanPrice = parseInt(price.toString().replace(/[^0-9]/g, ''));
+    // Clean and validate price (handle currency format)
+    let cleanPrice;
+    if (typeof price === 'string') {
+      // Remove currency symbols, commas, and spaces
+      cleanPrice = parseInt(price.replace(/[$,€£¥\s]/g, ''));
+    } else {
+      cleanPrice = parseInt(price);
+    }
+    
     if (!cleanPrice || cleanPrice <= 0) {
+      console.error('Invalid price provided:', price);
       return res.status(400).json({ error: 'Invalid price provided' });
     }
+
+    // Convert numeric fields to integers
+    const cleanBedrooms = bedrooms ? parseInt(bedrooms) : 0;
+    const cleanBathrooms = bathrooms ? parseInt(bathrooms) : 0;
+    const cleanSquareFootage = squareFootage ? parseInt(squareFootage) : 0;
 
     // Create property document
     const newProperty = {
@@ -171,15 +192,15 @@ router.post('/create-listing', verifyToken, async (req, res) => {
       title: `${propertyType} at ${address}`,
       propertyType: propertyType.toLowerCase(),
       address,
-      street,
-      city,
-      state,
-      zip,
+      street: street.trim(),
+      city: city.trim(),
+      state: state.trim().toUpperCase(),
+      zip: zip.toString().trim(),
       price: cleanPrice,
-      bedrooms: parseInt(bedrooms) || 0,
-      bathrooms: parseInt(bathrooms) || 0,
-      squareFootage: parseInt(squareFootage) || 0,
-      description: description || '',
+      bedrooms: cleanBedrooms,
+      bathrooms: cleanBathrooms,
+      squareFootage: cleanSquareFootage,
+      description: description ? description.trim() : '',
       features: [], // Can be enhanced later
       status: 'active',
       seller_id: req.user.id,
@@ -190,7 +211,11 @@ router.post('/create-listing', verifyToken, async (req, res) => {
     console.log('Creating new property from conversation:', {
       id: newProperty.id,
       title: newProperty.title,
-      price: newProperty.price
+      price: newProperty.price,
+      address: newProperty.address,
+      bedrooms: newProperty.bedrooms,
+      bathrooms: newProperty.bathrooms,
+      squareFootage: newProperty.squareFootage
     });
 
     // Index property in Watsonx Discovery

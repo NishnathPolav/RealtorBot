@@ -25,12 +25,15 @@ const verifyToken = (req, res, next) => {
 // Create a new assistant session
 router.post('/session', verifyToken, async (req, res) => {
   try {
+    console.log('Creating new assistant session for user:', req.user.id);
     const result = await watsonAssistant.createSession();
     
     if (!result.success) {
+      console.error('Failed to create session:', result.error);
       return res.status(500).json({ error: result.error });
     }
 
+    console.log('Session created successfully:', result.sessionId);
     res.json({
       success: true,
       sessionId: result.sessionId
@@ -61,17 +64,37 @@ router.post('/message', verifyToken, async (req, res) => {
     const result = await watsonAssistant.sendMessage(message, sessionId);
     
     if (!result.success) {
+      console.error('Assistant message failed:', result.error);
       return res.status(500).json({ error: result.error });
     }
 
     const assistantResponse = result.response;
-    const responseText = assistantResponse.output.generic?.[0]?.text || 'I apologize, but I couldn\'t process your request.';
+    console.log('Assistant response structure:', {
+      hasOutput: !!assistantResponse.output,
+      hasGeneric: !!(assistantResponse.output && assistantResponse.output.generic),
+      hasActions: !!(assistantResponse.output && assistantResponse.output.actions),
+      hasContext: !!assistantResponse.context
+    });
+
+    // Extract the response text from the assistant
+    let responseText = 'I apologize, but I couldn\'t process your request.';
     
+    if (assistantResponse.output && assistantResponse.output.generic) {
+      const genericResponse = assistantResponse.output.generic.find(item => item.response_type === 'text');
+      if (genericResponse) {
+        responseText = genericResponse.text;
+      }
+    }
+
     // Check if the assistant wants to perform an action
-    const actions = assistantResponse.output.actions || [];
+    const actions = assistantResponse.output?.actions || [];
     let actionResults = [];
 
+    console.log('Processing actions:', actions.length);
+
     for (const action of actions) {
+      console.log('Processing action:', action.name, action.parameters);
+      
       if (action.name === 'search_properties' && req.user.role === 'buyer') {
         // Handle property search action
         const searchResult = await handlePropertySearch(action.parameters, req.user);
@@ -86,6 +109,46 @@ router.post('/message', verifyToken, async (req, res) => {
           action: 'create_listing',
           result: createResult
         });
+      }
+    }
+
+    // Check if this is a confirmation response (Yes/No) for sellers
+    const isConfirmation = message.toLowerCase().trim() === 'yes' || message.toLowerCase().trim() === 'no';
+    if (isConfirmation && req.user.role === 'seller') {
+      console.log('Processing confirmation response:', message);
+      
+      // If user confirmed with "yes", proceed with listing creation using context variables
+      if (message.toLowerCase().trim() === 'yes') {
+        const context = assistantResponse.context;
+        if (context && context.variables) {
+          const variables = context.variables;
+          console.log('Processing confirmation with variables:', variables);
+          
+          // Check if we have all required variables for listing creation
+          const requiredFields = ['propertyType', 'street', 'city', 'state', 'zip', 'price'];
+          const hasAllRequired = requiredFields.every(field => variables[field]);
+          
+          if (hasAllRequired) {
+            console.log('All required fields present, creating listing');
+            const createResult = await handleCreateListing(variables, req.user);
+            if (createResult.success) {
+              actionResults.push({
+                action: 'create_listing',
+                result: createResult
+              });
+            } else {
+              console.error('Failed to create listing:', createResult.error);
+            }
+          } else {
+            console.log('Missing required fields for listing creation:', {
+              required: requiredFields,
+              present: Object.keys(variables),
+              missing: requiredFields.filter(field => !variables[field])
+            });
+          }
+        } else {
+          console.log('No context variables found for listing creation');
+        }
       }
     }
 
@@ -107,6 +170,7 @@ router.post('/message', verifyToken, async (req, res) => {
 router.delete('/session/:sessionId', verifyToken, async (req, res) => {
   try {
     const { sessionId } = req.params;
+    console.log('Deleting session:', sessionId);
     const result = await watsonAssistant.deleteSession(sessionId);
     
     if (!result.success) {
@@ -123,6 +187,7 @@ router.delete('/session/:sessionId', verifyToken, async (req, res) => {
 // Helper function to handle property search action
 async function handlePropertySearch(parameters, user) {
   try {
+    console.log('Handling property search with parameters:', parameters);
     const { budget, location, bedrooms, bathrooms, features } = parameters;
     
     // Build search query based on parameters
@@ -158,6 +223,9 @@ async function handlePropertySearch(parameters, user) {
       }
     }
 
+    console.log('Search query:', searchQuery);
+    console.log('Filters:', filters);
+
     // Search for properties
     const result = await watsonDiscovery.searchDocuments(
       process.env.PROPERTIES_COLLECTION,
@@ -166,6 +234,7 @@ async function handlePropertySearch(parameters, user) {
     );
 
     if (!result.success) {
+      console.error('Property search failed:', result.error);
       return { success: false, error: 'Failed to search properties' };
     }
 
@@ -191,6 +260,8 @@ async function handlePropertySearch(parameters, user) {
       .sort((a, b) => b.score - a.score)
       .slice(0, 6);
 
+    console.log(`Found ${sortedProperties.length} matching properties`);
+
     return {
       success: true,
       properties: sortedProperties,
@@ -206,6 +277,7 @@ async function handlePropertySearch(parameters, user) {
 // Helper function to handle listing creation action
 async function handleCreateListing(parameters, user) {
   try {
+    console.log('Handling listing creation with parameters:', parameters);
     const { 
       propertyType, 
       street, 
@@ -224,17 +296,38 @@ async function handleCreateListing(parameters, user) {
 
     // Validate required fields
     if (!propertyType || !street || !city || !state || !zip || !price) {
+      console.error('Missing required fields for listing creation:', {
+        propertyType: !!propertyType,
+        street: !!street,
+        city: !!city,
+        state: !!state,
+        zip: !!zip,
+        price: !!price
+      });
       return { 
         success: false, 
         error: 'Property type, street, city, state, zip, and price are required' 
       };
     }
 
-    // Clean and validate price
-    const cleanPrice = parseInt(price.toString().replace(/[^0-9]/g, ''));
+    // Clean and validate price (handle currency format)
+    let cleanPrice;
+    if (typeof price === 'string') {
+      // Remove currency symbols, commas, and spaces
+      cleanPrice = parseInt(price.replace(/[$,€£¥\s]/g, ''));
+    } else {
+      cleanPrice = parseInt(price);
+    }
+    
     if (!cleanPrice || cleanPrice <= 0) {
+      console.error('Invalid price provided:', price);
       return { success: false, error: 'Invalid price provided' };
     }
+
+    // Convert numeric fields to integers
+    const cleanBedrooms = bedrooms ? parseInt(bedrooms) : 0;
+    const cleanBathrooms = bathrooms ? parseInt(bathrooms) : 0;
+    const cleanSquareFootage = squareFootage ? parseInt(squareFootage) : 0;
 
     // Create property document
     const newProperty = {
@@ -242,21 +335,31 @@ async function handleCreateListing(parameters, user) {
       title: `${propertyType} at ${address}`,
       propertyType: propertyType.toLowerCase(),
       address,
-      street,
-      city,
-      state,
-      zip,
+      street: street.trim(),
+      city: city.trim(),
+      state: state.trim().toUpperCase(),
+      zip: zip.toString().trim(),
       price: cleanPrice,
-      bedrooms: parseInt(bedrooms) || 0,
-      bathrooms: parseInt(bathrooms) || 0,
-      squareFootage: parseInt(squareFootage) || 0,
-      description: description || '',
-      features: [],
+      bedrooms: cleanBedrooms,
+      bathrooms: cleanBathrooms,
+      squareFootage: cleanSquareFootage,
+      description: description ? description.trim() : '',
+      features: [], // Can be enhanced later
       status: 'active',
       seller_id: user.id,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
+
+    console.log('Creating new property:', {
+      id: newProperty.id,
+      title: newProperty.title,
+      price: newProperty.price,
+      address: newProperty.address,
+      bedrooms: newProperty.bedrooms,
+      bathrooms: newProperty.bathrooms,
+      squareFootage: newProperty.squareFootage
+    });
 
     // Index property in Watsonx Discovery
     const result = await watsonDiscovery.indexDocument(
@@ -265,11 +368,15 @@ async function handleCreateListing(parameters, user) {
     );
 
     if (!result.success) {
+      console.error('Failed to index property:', result.error);
       return { success: false, error: 'Failed to create property listing' };
     }
 
+    console.log('Property created successfully:', newProperty.id);
+
     return {
       success: true,
+      message: 'Property listing created successfully!',
       property: {
         id: newProperty.id,
         title: newProperty.title,

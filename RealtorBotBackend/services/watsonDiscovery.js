@@ -316,6 +316,61 @@ class WatsonDiscoveryService {
       return { success: false, error: error.message };
     }
   }
+
+  // Ensure properties collection exists with proper mappings
+  async ensurePropertiesCollection() {
+    try {
+      console.log('Ensuring properties collection exists...');
+      
+      // First, try to get the existing collection to check if it exists
+      try {
+        const existingCollection = await this.client.get('/properties');
+        console.log('Properties collection already exists');
+        return { success: true, data: existingCollection.data, exists: true };
+      } catch (error) {
+        if (error.response && error.response.status === 404) {
+          // Collection doesn't exist, create it
+          console.log('Properties collection does not exist, creating...');
+        } else {
+          // Some other error, re-throw
+          throw error;
+        }
+      }
+      
+      // Create new collection with proper mapping for properties
+      const response = await this.client.put(`/properties`, {
+        mappings: {
+          properties: {
+            id: { type: 'keyword' },
+            title: { type: 'text' },
+            propertyType: { type: 'keyword' },
+            address: { type: 'text' },
+            street: { type: 'text' },
+            city: { type: 'text' },
+            state: { type: 'keyword' },
+            zip: { type: 'keyword' },
+            price: { type: 'integer' },
+            bedrooms: { type: 'integer' },
+            bathrooms: { type: 'integer' },
+            squareFootage: { type: 'integer' },
+            description: { type: 'text' },
+            features: { type: 'keyword' },
+            status: { type: 'keyword' },
+            seller_id: { type: 'keyword' },
+            image: { type: 'text' },
+            created_at: { type: 'date' },
+            updated_at: { type: 'date' }
+          }
+        }
+      });
+      
+      console.log('Properties collection created successfully');
+      return { success: true, data: response.data, exists: false };
+    } catch (error) {
+      console.error('Ensure properties collection failed:', error.message);
+      return { success: false, error: error.message };
+    }
+  }
 }
 
 module.exports = new WatsonDiscoveryService(); 

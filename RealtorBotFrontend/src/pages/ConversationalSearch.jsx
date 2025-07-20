@@ -7,9 +7,7 @@ import {
   Button,
   List,
   ListItem,
-  ListItemText,
   Avatar,
-  Divider,
   Chip,
   Card,
   CardContent,
@@ -20,7 +18,6 @@ import {
 import { Send as SendIcon, Person as PersonIcon, SmartToy as BotIcon } from '@mui/icons-material';
 import { useAuth } from '../components/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { getPropertyRecommendations, createListingFromConversation } from '../services/conversationalAPI';
 import { createAssistantSession, sendAssistantMessage, deleteAssistantSession } from '../services/assistantAPI';
 
 const ConversationalSearch = () => {
@@ -32,14 +29,11 @@ const ConversationalSearch = () => {
   const [sessionId, setSessionId] = useState(null);
   const [suggestedProperties, setSuggestedProperties] = useState([]);
   const [error, setError] = useState(null);
+  const [isInitialized, setIsInitialized] = useState(false);
   const messagesEndRef = useRef(null);
 
   const isBuyer = user?.role === 'buyer';
   const isSeller = user?.role === 'seller';
-
-  console.log('ConversationalSearch component loaded');
-  console.log('User:', user);
-  console.log('isBuyer:', isBuyer, 'isSeller:', isSeller);
 
   // Auto-scroll to bottom when new messages arrive
   const scrollToBottom = () => {
@@ -59,52 +53,17 @@ const ConversationalSearch = () => {
         // Create a new assistant session
         const sessionResult = await createAssistantSession();
         setSessionId(sessionResult.sessionId);
+        setIsInitialized(true);
         
-        // Send initial message based on user role
-        let initialMessage = '';
-        if (isBuyer) {
-          initialMessage = "Hello! I'm a buyer looking for properties. Can you help me find my perfect home?";
-        } else if (isSeller) {
-          initialMessage = "Hello! I'm a seller looking to create a property listing. Can you help me with that?";
-        } else {
-          initialMessage = "Hello! I'm here to help with real estate. What can I assist you with today?";
-        }
-        
-        // Send initial message to assistant
-        const response = await sendAssistantMessage(initialMessage, sessionResult.sessionId);
-        
-        // Add assistant's response to messages
-        const botMessage = {
-          id: Date.now(),
-          type: 'bot',
-          content: response.response,
-          timestamp: new Date()
-        };
-        
-        setMessages([botMessage]);
-        
-        // Handle any actions from the assistant
-        if (response.actions && response.actions.length > 0) {
-          handleAssistantActions(response.actions);
-        }
+        console.log('Assistant session created successfully:', sessionResult.sessionId);
         
       } catch (error) {
         console.error('Error initializing assistant:', error);
         setError('Failed to initialize AI assistant. Please try again.');
-        
-        // Fallback to basic welcome message
-        setMessages([
-          {
-            id: 1,
-            type: 'bot',
-            content: `Hello! I'm your AI real estate assistant. How can I help you today?`,
-            timestamp: new Date()
-          }
-        ]);
       }
     };
     
-    if (user) {
+    if (user && !isInitialized) {
       initializeAssistant();
     }
     
@@ -114,30 +73,21 @@ const ConversationalSearch = () => {
         deleteAssistantSession(sessionId).catch(console.error);
       }
     };
-  }, [user, isBuyer, isSeller]);
+  }, [user, isInitialized]);
 
-  // Handle assistant actions (like search results or listing creation)
+  // Handle assistant actions (like search results)
   const handleAssistantActions = (actions) => {
+    console.log('Handling assistant actions:', actions);
+    
     actions.forEach(action => {
       if (action.action === 'search_properties' && action.result.success) {
         setSuggestedProperties(action.result.properties || []);
-      } else if (action.action === 'create_listing' && action.result.success) {
-        // Show success message for listing creation
-        const successMessage = {
-          id: Date.now(),
-          type: 'bot',
-          content: `Great! I've successfully created your listing: ${action.result.property.title} at ${action.result.property.address} for ${action.result.property.price}`,
-          timestamp: new Date()
-        };
-        setMessages(prev => [...prev, successMessage]);
       }
     });
   };
 
   const handleSendMessage = async () => {
-    if (!inputMessage.trim()) return;
-
-    console.log('handleSendMessage called with:', inputMessage);
+    if (!inputMessage.trim() || !sessionId) return;
 
     const userMessage = {
       id: Date.now(),
@@ -147,49 +97,51 @@ const ConversationalSearch = () => {
     };
 
     setMessages(prev => [...prev, userMessage]);
+    const currentInput = inputMessage;
     setInputMessage('');
     setIsTyping(true);
     setError(null);
 
-    // Send message to Watsonx Assistant
-    setTimeout(async () => {
-      try {
-        console.log('Sending message to Watsonx Assistant:', inputMessage);
-        const response = await sendAssistantMessage(inputMessage, sessionId);
-        
-        // Add assistant's response to messages
+    try {
+      console.log('Sending message to Watsonx Assistant:', currentInput);
+      const response = await sendAssistantMessage(currentInput, sessionId);
+      
+      console.log('Assistant response:', response);
+      
+      // Extract the response text from the assistant
+      let responseText = '';
+      
+      if (response.response && response.response.output && response.response.output.generic) {
+        const genericResponse = response.response.output.generic.find(item => item.response_type === 'text');
+        if (genericResponse) {
+          responseText = genericResponse.text;
+        }
+      }
+      
+      // Only add assistant response if there's actual content
+      if (responseText) {
         const botMessage = {
           id: Date.now(),
           type: 'bot',
-          content: response.response,
+          content: responseText,
           timestamp: new Date()
         };
         
         setMessages(prev => [...prev, botMessage]);
-        
-        // Handle any actions from the assistant
-        if (response.actions && response.actions.length > 0) {
-          handleAssistantActions(response.actions);
-        }
-        
-      } catch (error) {
-        console.error('Error processing user response:', error);
-        setError(error.message);
-        
-        const errorMessage = {
-          id: Date.now(),
-          type: 'bot',
-          content: `I'm sorry, I encountered an error: ${error.message}. Please try again.`,
-          timestamp: new Date()
-        };
-        setMessages(prev => [...prev, errorMessage]);
-      } finally {
-        setIsTyping(false);
       }
-    }, 1000);
+      
+      // Handle any actions from the assistant
+      if (response.actions && response.actions.length > 0) {
+        handleAssistantActions(response.actions);
+      }
+      
+    } catch (error) {
+      console.error('Error processing user response:', error);
+      setError(error.message);
+    } finally {
+      setIsTyping(false);
+    }
   };
-
-
 
   const handleViewListing = (listingId) => {
     navigate(`/listing/${listingId}`);
@@ -201,6 +153,33 @@ const ConversationalSearch = () => {
       handleSendMessage();
     }
   };
+
+  // If user is not authenticated, show login/signup options
+  if (!user) {
+    return (
+      <Box display="flex" flexDirection="column" sx={{ height: '70vh' }}>
+        <Typography variant="h4" gutterBottom>AI Property Assistant</Typography>
+        <Paper sx={{ flex: 1, p: 2, mb: 2, overflowY: 'auto' }}>
+          <Typography variant="body2" color="text.secondary">
+            Please sign up or log in to start chatting with our AI assistant.
+          </Typography>
+        </Paper>
+        <Box textAlign="center" mt={2}>
+          <Typography variant="body1" gutterBottom>
+            Please Sign Up or Log In to get Started
+          </Typography>
+          <Box display="flex" justifyContent="center" gap={2}>
+            <Button variant="contained" color="primary" onClick={() => navigate('/signup')}>
+              Sign Up
+            </Button>
+            <Button variant="outlined" color="primary" onClick={() => navigate('/login')}>
+              Log In
+            </Button>
+          </Box>
+        </Box>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ height: 'calc(100vh - 200px)', display: 'flex', flexDirection: 'column' }}>
@@ -333,12 +312,12 @@ const ConversationalSearch = () => {
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               onKeyPress={handleKeyPress}
-              disabled={isTyping}
+              disabled={isTyping || !sessionId}
             />
             <Button
               variant="contained"
               onClick={handleSendMessage}
-              disabled={!inputMessage.trim() || isTyping}
+              disabled={!inputMessage.trim() || isTyping || !sessionId}
               sx={{ minWidth: 'auto', px: 2 }}
             >
               <SendIcon />

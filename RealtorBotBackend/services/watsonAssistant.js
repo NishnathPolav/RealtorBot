@@ -22,9 +22,17 @@ class WatsonAssistantService {
   // Create a new session
   async createSession() {
     try {
-      const url = `${this.serviceUrl.replace(/\/instances\/.+$/, '')}/v2/assistants/${this.environmentId}/sessions?version=${this.apiVersion}`;
+      // Extract the base URL from the service URL
+      const baseUrl = this.serviceUrl.replace(/\/instances\/.+$/, '');
+      const url = `${baseUrl}/v2/assistants/${this.environmentId}/sessions?version=${this.apiVersion}`;
+      
+      console.log('Creating session with URL:', url);
+      console.log('Environment ID:', this.environmentId);
+      
       const response = await axios.post(url, {}, this.getAuthConfig());
       this.sessionId = response.data.session_id;
+      
+      console.log('Session created successfully:', this.sessionId);
       return { success: true, sessionId: this.sessionId };
     } catch (error) {
       console.error('Failed to create Watsonx Assistant session:', error.response?.data || error.message);
@@ -42,7 +50,15 @@ class WatsonAssistantService {
           return sessionResult;
         }
       }
-      const url = `${this.serviceUrl.replace(/\/instances\/.+$/, '')}/v2/assistants/${this.environmentId}/sessions/${sessionToUse}/message?version=${this.apiVersion}`;
+      
+      // Extract the base URL from the service URL
+      const baseUrl = this.serviceUrl.replace(/\/instances\/.+$/, '');
+      const url = `${baseUrl}/v2/assistants/${this.environmentId}/sessions/${sessionToUse}/message?version=${this.apiVersion}`;
+      
+      console.log('Sending message to URL:', url);
+      console.log('Message:', message);
+      console.log('Session ID:', sessionToUse);
+      
       const response = await axios.post(
         url,
         {
@@ -53,6 +69,15 @@ class WatsonAssistantService {
         },
         this.getAuthConfig()
       );
+      
+      console.log('Assistant response received:', {
+        hasOutput: !!response.data.output,
+        hasActions: !!(response.data.output && response.data.output.actions),
+        actionsCount: response.data.output?.actions?.length || 0,
+        hasGeneric: !!(response.data.output && response.data.output.generic),
+        genericCount: response.data.output?.generic?.length || 0
+      });
+      
       return {
         success: true,
         response: response.data,
@@ -69,7 +94,8 @@ class WatsonAssistantService {
     try {
       const sessionToUse = sessionId || this.sessionId;
       if (sessionToUse) {
-        const url = `${this.serviceUrl.replace(/\/instances\/.+$/, '')}/v2/assistants/${this.environmentId}/sessions/${sessionToUse}?version=${this.apiVersion}`;
+        const baseUrl = this.serviceUrl.replace(/\/instances\/.+$/, '');
+        const url = `${baseUrl}/v2/assistants/${this.environmentId}/sessions/${sessionToUse}?version=${this.apiVersion}`;
         await axios.delete(url, this.getAuthConfig());
       }
       return { success: true };

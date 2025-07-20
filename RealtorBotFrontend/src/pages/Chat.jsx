@@ -1,52 +1,998 @@
-//import React from 'react';
-//import Typography from '@mui/material/Typography';
-
-//const Chat = () => (
-  //<div>
-    //<Typography variant="h4" gutterBottom>Chat</Typography>
-    //{/* Conversational AI agent handling tasks */}
-  //</div>
-//);
-
-//export default Chat;
-
-import React from 'react';
-import Typography from '@mui/material/Typography';
-import Box from '@mui/material/Box';
-import Paper from '@mui/material/Paper';
-import Button from '@mui/material/Button';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  Typography,
+  Box,
+  Paper,
+  TextField,
+  Button,
+  List,
+  ListItem,
+  ListItemText,
+  Avatar,
+  Divider,
+  Chip,
+  Card,
+  CardContent,
+  Grid,
+  CircularProgress,
+  Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Stepper,
+  Step,
+  StepLabel
+} from '@mui/material';
+import { Send as SendIcon, Person as PersonIcon, SmartToy as BotIcon } from '@mui/icons-material';
+import { useAuth } from '../components/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { createAssistantSession, sendAssistantMessage, deleteAssistantSession } from '../services/assistantAPI';
+import { propertiesAPI } from '../services/api';
+
 const Chat = () => {
+  const { user } = useAuth();
   const navigate = useNavigate();
-  const handleSignup = () => {
-    navigate('/signup');
+  const [messages, setMessages] = useState([]);
+  const [inputMessage, setInputMessage] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const [sessionId, setSessionId] = useState(null);
+  const [suggestedProperties, setSuggestedProperties] = useState([]);
+  const [error, setError] = useState(null);
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [baseMessageAdded, setBaseMessageAdded] = useState(false);
+  
+  // Property listing creation state
+  const [propertyInfo, setPropertyInfo] = useState({
+    title: '',
+    street: '',
+    city: '',
+    state: '',
+    zip: '',
+    price: '',
+    description: ''
+  });
+  const [showListingConfirmation, setShowListingConfirmation] = useState(false);
+  const [isCreatingListing, setIsCreatingListing] = useState(false);
+  const [listingCreationResult, setListingCreationResult] = useState(null);
+  
+  // Track conversation state for property listing creation
+  const [conversationState, setConversationState] = useState({
+    isListingConversation: false,
+    currentStep: 0,
+    variables: {
+      propertyType: '',
+      street: '',
+      city: '',
+      state: '',
+      zip: '',
+      price: '',
+      bedrooms: '',
+      bathrooms: '',
+      squareFootage: '',
+      description: ''
+    }
+  });
+
+  // Define the expected assistant prompts in order
+  const listingPrompts = [
+    "I'll help you create a listing for your property",
+    "What's the street address of the property?",
+    "What city is the property in?",
+    "What state is the property in (e.g., NY, CA)?",
+    "What's the ZIP code?",
+    "What's your asking price?",
+    "How many bedrooms?",
+    "How many bathrooms?",
+    "What's the square footage?",
+    "Describe your property (features, condition, etc.)"
+  ];
+
+  // Check if a message contains a listing prompt
+  const isListingPrompt = (message) => {
+    return listingPrompts.some(prompt => 
+      message.toLowerCase().includes(prompt.toLowerCase())
+    );
   };
 
-  const handleLogin = () => {
-    navigate('/login');
+  // Check if this is a property listing conversation
+  const isPropertyListingConversation = (messages) => {
+    const recentMessages = messages.slice(-5);
+    const conversationText = recentMessages.map(m => m.content.toLowerCase()).join(' ');
+    
+    const listingKeywords = [
+      'create listing', 'list my property', 'add property', 'sell my house',
+      'list house', 'list apartment', 'property listing', 'create property',
+      'add listing', 'sell property', 'list my house'
+    ];
+    
+    return listingKeywords.some(keyword => conversationText.includes(keyword));
   };
 
-  return (
-    <Box display="flex" flexDirection="column" sx={{ height: '70vh' }}>
-      <Typography variant="h4" gutterBottom>Chat</Typography>
-      <Paper sx={{ flex: 1, p: 2, mb: 2, overflowY: 'auto' }}>
-        <Typography variant="body2" color="text.secondary">
-          Conversation will appear here.
-        </Typography>
-      </Paper>
-      <Box textAlign="center" mt={2}>
-        <Typography variant="body1" gutterBottom>
-          Please Sign Up or Log In to get Started
-        </Typography>
-        <Box display="flex" justifyContent="center" gap={2}>
-          <Button variant="contained" color="primary" onClick={handleSignup}>
-            Sign Up
-          </Button>
-          <Button variant="outlined" color="primary" onClick={handleLogin}>
-            Log In
-          </Button>
+  // Extract property information based on conversation flow
+  const extractPropertyInfoFromConversation = (messages) => {
+    const variables = {
+      propertyType: '',
+      street: '',
+      city: '',
+      state: '',
+      zip: '',
+      price: '',
+      bedrooms: '',
+      bathrooms: '',
+      squareFootage: '',
+      description: ''
+    };
+
+    let currentStep = 0;
+    let lastBotMessage = '';
+
+    // Process messages in order to track the conversation flow
+    for (let i = 0; i < messages.length; i++) {
+      const message = messages[i];
+      
+      if (message.type === 'bot') {
+        lastBotMessage = message.content;
+        
+        // Check if this is a listing prompt and update current step
+        if (isListingPrompt(message.content)) {
+          for (let j = 0; j < listingPrompts.length; j++) {
+            if (message.content.toLowerCase().includes(listingPrompts[j].toLowerCase())) {
+              currentStep = j;
+              break;
+            }
+          }
+        }
+      } else if (message.type === 'user') {
+        // Skip trigger phrases
+        const triggerPhrases = ['create listing', 'list my property', 'add property', 'sell my house'];
+        const isTrigger = triggerPhrases.some(phrase => 
+          message.content.toLowerCase().includes(phrase.toLowerCase())
+        );
+        
+        if (!isTrigger) {
+          // Assign user response to the appropriate variable based on current step
+          switch (currentStep) {
+            case 0: // "I'll help you create a listing for your property"
+              variables.propertyType = message.content.trim();
+              break;
+            case 1: // "What's the street address of the property?"
+              variables.street = message.content.trim();
+              break;
+            case 2: // "What city is the property in?"
+              variables.city = message.content.trim();
+              break;
+            case 3: // "What state is the property in (e.g., NY, CA)?"
+              variables.state = message.content.trim();
+              break;
+            case 4: // "What's the ZIP code?"
+              variables.zip = message.content.trim();
+              break;
+            case 5: // "What's your asking price?"
+              variables.price = message.content.trim();
+              break;
+            case 6: // "How many bedrooms?"
+              variables.bedrooms = message.content.trim();
+              break;
+            case 7: // "How many bathrooms?"
+              variables.bathrooms = message.content.trim();
+              break;
+            case 8: // "What's the square footage?"
+              variables.squareFootage = message.content.trim();
+              break;
+            case 9: // "Describe your property (features, condition, etc.)"
+              variables.description = message.content.trim();
+              break;
+          }
+        }
+      }
+    }
+
+    // Check if we have all required fields
+    const requiredFields = ['propertyType', 'street', 'city', 'state', 'zip', 'price'];
+    const hasAllRequired = requiredFields.every(field => variables[field] && variables[field].trim());
+    
+    // Create property info object
+    const propertyInfo = {
+      title: variables.propertyType ? `${variables.propertyType} at ${variables.street || ''}` : '',
+      street: variables.street,
+      city: variables.city,
+      state: variables.state,
+      zip: variables.zip,
+      price: variables.price,
+      description: variables.description,
+      bedrooms: variables.bedrooms,
+      bathrooms: variables.bathrooms,
+      squareFootage: variables.squareFootage
+    };
+
+    console.log('Extracted variables from conversation:', variables);
+    console.log('Property info:', propertyInfo);
+    console.log('Has all required fields:', hasAllRequired);
+
+    return hasAllRequired ? propertyInfo : null;
+  };
+
+  const messagesEndRef = useRef(null);
+
+  const isBuyer = user?.role === 'buyer';
+  const isSeller = user?.role === 'seller';
+
+  console.log('Chat component loaded');
+  console.log('User:', user);
+  console.log('isBuyer:', isBuyer, 'isSeller:', isSeller);
+
+  // Auto-scroll to bottom when new messages arrive
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  // Initialize base message immediately when component mounts
+  useEffect(() => {
+    console.log('Chat component mounted, setting initial base message');
+    const baseMessage = {
+      id: 'base-message',
+      type: 'bot',
+      content: 'Hello! I am your AI Assistant, how can I help?',
+      timestamp: new Date()
+    };
+    setMessages([baseMessage]);
+    setBaseMessageAdded(true);
+    console.log('Initial base message set in Chat component:', baseMessage);
+  }, []);
+
+  // Safeguard: Ensure base message is always present
+  useEffect(() => {
+    const hasBaseMessage = messages.some(msg => msg.id === 'base-message');
+    if (!hasBaseMessage && messages.length > 0) {
+      console.log('Base message missing in Chat component, restoring it');
+      const baseMessage = {
+        id: 'base-message',
+        type: 'bot',
+        content: 'Hello! I am your AI Assistant, how can I help?',
+        timestamp: new Date()
+      };
+      setMessages(prev => [baseMessage, ...prev]);
+    }
+  }, [messages]);
+
+  // Initialize conversation with Watsonx Assistant (only create session, no preset messages)
+  useEffect(() => {
+    const initializeAssistant = async () => {
+      try {
+        console.log('Initializing Watsonx Assistant session...');
+        console.log('Current user:', user);
+        
+        // Create a new assistant session
+        const sessionResult = await createAssistantSession();
+        console.log('Session creation result:', sessionResult);
+        
+        setSessionId(sessionResult.sessionId);
+        setIsInitialized(true);
+        
+        console.log('Assistant session created successfully:', sessionResult.sessionId);
+        
+        // Don't add any preset messages - let the user start the conversation
+        
+      } catch (error) {
+        console.error('Error initializing assistant:', error);
+        setError('Failed to initialize AI assistant. Please try again.');
+        
+        // Add error message to chat for debugging
+        const errorMessage = {
+          id: Date.now(),
+          type: 'bot',
+          content: `Failed to initialize assistant: ${error.message}`,
+          timestamp: new Date()
+        };
+        setMessages([errorMessage]);
+      }
+    };
+    
+    if (user && !isInitialized && !sessionId) {
+      console.log('Starting assistant initialization for user:', user);
+      initializeAssistant();
+    } else {
+      console.log('Skipping initialization - user:', user, 'isInitialized:', isInitialized, 'sessionId:', sessionId);
+    }
+    
+    // Cleanup function to delete session when component unmounts
+    return () => {
+      if (sessionId) {
+        deleteAssistantSession(sessionId).catch(console.error);
+      }
+    };
+  }, [user, isBuyer, isSeller]);
+
+  // Extract property information from assistant context
+  const extractPropertyInfo = (context) => {
+    if (!context || !context.variables) return null;
+    
+    const variables = context.variables;
+    const extracted = {
+      title: variables.propertyType ? `${variables.propertyType} at ${variables.street || ''}` : '',
+      street: variables.street || '',
+      city: variables.city || '',
+      state: variables.state || '',
+      zip: variables.zip || '',
+      price: variables.price || '',
+      description: variables.description || ''
+    };
+    
+    // Check if we have all required fields
+    const requiredFields = ['street', 'city', 'state', 'zip', 'price'];
+    const hasAllRequired = requiredFields.every(field => extracted[field] && extracted[field].trim());
+    
+    return hasAllRequired ? extracted : null;
+  };
+
+  // Check if the conversation indicates property listing creation
+  const checkListingReadiness = (messages) => {
+    // Only check for sellers
+    if (!isSeller) return null;
+    
+    // Check if this is a property listing conversation
+    if (!isPropertyListingConversation(messages)) return null;
+    
+    // Extract property information from messages
+    const extractedInfo = extractPropertyInfoFromConversation(messages);
+    
+    if (extractedInfo) {
+      console.log('Extracted property info from conversation:', extractedInfo);
+      return extractedInfo;
+    }
+    
+    return null;
+  };
+
+  // Handle assistant actions (like search results or listing creation)
+  const handleAssistantActions = (actions) => {
+    console.log('Handling assistant actions:', actions);
+    
+    actions.forEach(action => {
+      if (action.action === 'search_properties' && action.result.success) {
+        setSuggestedProperties(action.result.properties || []);
+      } else if (action.action === 'create_listing' && action.result.success) {
+        // Clear any suggested properties since this is for sellers
+        setSuggestedProperties([]);
+        
+        // Show success message
+        const successMessage = {
+          id: Date.now(),
+          type: 'bot',
+          content: `Great! Your property listing has been created successfully. You can view it in your seller dashboard.`,
+          timestamp: new Date()
+        };
+        setMessages(prev => [...prev, successMessage]);
+        
+        // Reset property info
+        setPropertyInfo({
+          title: '',
+          street: '',
+          city: '',
+          state: '',
+          zip: '',
+          price: '',
+          description: ''
+        });
+      }
+    });
+  };
+
+  const handleSendMessage = async () => {
+    console.log('=== handleSendMessage START ===');
+    console.log('inputMessage:', inputMessage);
+    console.log('sessionId:', sessionId);
+    console.log('user:', user);
+    
+    if (!inputMessage.trim() || !sessionId) {
+      console.log('Early return - missing input or sessionId');
+      return;
+    }
+
+    console.log('handleSendMessage called with:', inputMessage);
+    console.log('Current sessionId:', sessionId);
+    console.log('Current user:', user);
+
+    const userMessage = {
+      id: Date.now(),
+      type: 'user',
+      content: inputMessage,
+      timestamp: new Date()
+    };
+
+    console.log('Adding user message to chat:', userMessage);
+    setMessages(prev => {
+      console.log('Current messages before adding user message:', prev);
+      const newMessages = [...prev, userMessage];
+      console.log('Messages after adding user message:', newMessages);
+      return newMessages;
+    });
+    const currentInput = inputMessage;
+    setInputMessage('');
+    setIsTyping(true);
+    setError(null);
+
+    try {
+      console.log('Sending message to Watsonx Assistant:', currentInput);
+      const response = await sendAssistantMessage(currentInput, sessionId);
+      
+      console.log('Assistant response received:', response);
+      console.log('Response structure:', {
+        hasResponse: !!response.response,
+        hasOutput: !!(response.response && response.response.output),
+        hasGeneric: !!(response.response && response.response.output && response.response.output.generic),
+        genericCount: response.response?.output?.generic?.length || 0,
+        directResponse: typeof response.response === 'string'
+      });
+      
+      // Extract the response text from the assistant
+      let responseText = '';
+      
+      // Check if response is a direct string (backend format)
+      if (typeof response.response === 'string') {
+        responseText = response.response;
+        console.log('Found direct string response:', responseText);
+      }
+      // Check if response has the Watson Assistant structure
+      else if (response.response && response.response.output && response.response.output.generic) {
+        console.log('Processing generic responses:', response.response.output.generic);
+        const genericResponse = response.response.output.generic.find(item => item.response_type === 'text');
+        if (genericResponse) {
+          responseText = genericResponse.text;
+          console.log('Found text response:', responseText);
+        } else {
+          console.log('No text response found in generic responses');
+        }
+      } else {
+        console.log('No generic responses found in response structure');
+      }
+      
+      // Only add assistant response if there's actual content
+      let botMessage = null;
+      if (responseText) {
+        botMessage = {
+          id: Date.now(),
+          type: 'bot',
+          content: responseText,
+          timestamp: new Date()
+        };
+        
+        console.log('Adding bot message to chat:', botMessage);
+        setMessages(prev => {
+          console.log('Current messages before adding bot message:', prev);
+          const newMessages = [...prev, botMessage];
+          console.log('Messages after adding bot message:', newMessages);
+          return newMessages;
+        });
+        console.log('Added bot message to chat');
+      } else {
+        console.log('No response text found, not adding bot message');
+        // Add a fallback message for debugging
+        botMessage = {
+          id: Date.now(),
+          type: 'bot',
+          content: 'No response text found in assistant response',
+          timestamp: new Date()
+        };
+        setMessages(prev => {
+          console.log('Current messages before adding fallback message:', prev);
+          const newMessages = [...prev, botMessage];
+          console.log('Messages after adding fallback message:', newMessages);
+          return newMessages;
+        });
+      }
+      
+      // Handle any actions from the assistant
+      if (response.actions && response.actions.length > 0) {
+        console.log('Processing actions:', response.actions);
+        handleAssistantActions(response.actions);
+      }
+      
+      // Check for property information in conversation (for sellers)
+      if (isSeller) {
+        // Extract from conversation messages using the new flow-based approach
+        const updatedMessages = [...messages, userMessage];
+        if (botMessage) {
+          updatedMessages.push(botMessage);
+        }
+        
+        const extractedInfo = checkListingReadiness(updatedMessages);
+        
+        if (extractedInfo) {
+          console.log('Extracted property info:', extractedInfo);
+          setPropertyInfo(extractedInfo);
+          
+          // Show confirmation dialog if not already shown
+          if (!showListingConfirmation) {
+            setShowListingConfirmation(true);
+          }
+        }
+      }
+      
+    } catch (error) {
+      console.error('Error processing user response:', error);
+      setError(error.message);
+      
+      // Add error message to chat for debugging
+      const errorMessage = {
+        id: Date.now(),
+        type: 'bot',
+        content: `Error: ${error.message}`,
+        timestamp: new Date()
+      };
+      setMessages(prev => {
+        console.log('Current messages before adding error message:', prev);
+        const newMessages = [...prev, errorMessage];
+        console.log('Messages after adding error message:', newMessages);
+        return newMessages;
+      });
+    } finally {
+      setIsTyping(false);
+      console.log('=== handleSendMessage END ===');
+    }
+  };
+
+  // Handle listing creation confirmation
+  const handleConfirmListing = async () => {
+    setIsCreatingListing(true);
+    setShowListingConfirmation(false);
+    
+    try {
+      // Format price (remove currency symbols and commas) - match the manual form format
+      const cleanPrice = propertyInfo.price.toString().replace(/[$,€£¥\s]/g, '');
+      
+      // Create listing data matching the exact format from successful manual creation
+      const listingData = {
+        title: propertyInfo.title || `Property at ${propertyInfo.street}`,
+        street: propertyInfo.street,
+        city: propertyInfo.city,
+        state: propertyInfo.state,
+        zip: propertyInfo.zip,
+        price: parseInt(cleanPrice),
+        description: propertyInfo.description || ''
+      };
+      
+      console.log('Creating listing with data:', listingData);
+      console.log('Create property attempt:', {
+        title: listingData.title,
+        street: listingData.street,
+        city: listingData.city,
+        state: listingData.state,
+        zip: listingData.zip,
+        price: listingData.price,
+        seller_id: user.id
+      });
+      
+      const result = await propertiesAPI.create(listingData);
+      console.log('Listing creation result:', result);
+      
+      setListingCreationResult({
+        success: true,
+        message: 'Property listing created successfully!',
+        property: result
+      });
+      
+      // Add success message to chat
+      const successMessage = {
+        id: Date.now(),
+        type: 'bot',
+        content: 'Great! Your property listing has been created successfully. You can view it in your seller dashboard.',
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, successMessage]);
+      
+      // Reset property info
+      setPropertyInfo({
+        title: '',
+        street: '',
+        city: '',
+        state: '',
+        zip: '',
+        price: '',
+        description: ''
+      });
+      
+    } catch (error) {
+      console.error('Failed to create listing:', error);
+      setListingCreationResult({
+        success: false,
+        message: `Failed to create listing: ${error.message}`
+      });
+      
+      // Add error message to chat
+      const errorMessage = {
+        id: Date.now(),
+        type: 'bot',
+        content: `Sorry, I couldn't create your listing. Please try again or use the manual form.`,
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsCreatingListing(false);
+    }
+  };
+
+  const handleCancelListing = () => {
+    setShowListingConfirmation(false);
+    setPropertyInfo({
+      title: '',
+      street: '',
+      city: '',
+      state: '',
+      zip: '',
+      price: '',
+      description: ''
+    });
+  };
+
+  const handleViewListing = (listingId) => {
+    navigate(`/listing/${listingId}`);
+  };
+
+  const handleKeyPress = (e) => {
+    console.log('Key pressed:', e.key);
+    if (e.key === 'Enter' && !e.shiftKey) {
+      console.log('Enter key pressed, calling handleSendMessage');
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
+  const handleSendButtonClick = () => {
+    console.log('Send button clicked, calling handleSendMessage');
+    handleSendMessage();
+  };
+
+  // If user is not authenticated, show login/signup options
+  if (!user) {
+    return (
+      <Box display="flex" flexDirection="column" sx={{ height: '70vh' }}>
+        <Typography variant="h4" gutterBottom>AI Property Assistant</Typography>
+        <Paper sx={{ flex: 1, p: 2, mb: 2, overflowY: 'auto' }}>
+          <Typography variant="body2" color="text.secondary">
+            Please sign up or log in to start chatting with our AI assistant.
+          </Typography>
+        </Paper>
+        <Box textAlign="center" mt={2}>
+          <Typography variant="body1" gutterBottom>
+            Please Sign Up or Log In to get Started
+          </Typography>
+          <Box display="flex" justifyContent="center" gap={2}>
+            <Button variant="contained" color="primary" onClick={() => navigate('/signup')}>
+              Sign Up
+            </Button>
+            <Button variant="outlined" color="primary" onClick={() => navigate('/login')}>
+              Log In
+            </Button>
+          </Box>
         </Box>
       </Box>
+    );
+  }
+
+  return (
+    <Box sx={{ height: 'calc(100vh - 200px)', display: 'flex', flexDirection: 'column' }}>
+      <Typography variant="h4" gutterBottom>
+        AI Property Assistant
+      </Typography>
+      
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
+
+      {/* Property Listing Confirmation Dialog */}
+      <Dialog 
+        open={showListingConfirmation} 
+        onClose={handleCancelListing}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>Confirm Property Listing</DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" gutterBottom>
+            I've collected the following information about your property. Please review and confirm:
+          </Typography>
+          
+          <Box sx={{ mt: 2 }}>
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="Property Type"
+                  value={propertyInfo.title ? propertyInfo.title.split(' at ')[0] : ''}
+                  fullWidth
+                  margin="normal"
+                  InputProps={{ readOnly: true }}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="Price"
+                  value={propertyInfo.price}
+                  fullWidth
+                  margin="normal"
+                  InputProps={{ readOnly: true }}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  label="Street Address"
+                  value={propertyInfo.street}
+                  fullWidth
+                  margin="normal"
+                  InputProps={{ readOnly: true }}
+                />
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <TextField
+                  label="City"
+                  value={propertyInfo.city}
+                  fullWidth
+                  margin="normal"
+                  InputProps={{ readOnly: true }}
+                />
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <TextField
+                  label="State"
+                  value={propertyInfo.state}
+                  fullWidth
+                  margin="normal"
+                  InputProps={{ readOnly: true }}
+                />
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <TextField
+                  label="Zip Code"
+                  value={propertyInfo.zip}
+                  fullWidth
+                  margin="normal"
+                  InputProps={{ readOnly: true }}
+                />
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <TextField
+                  label="Bedrooms"
+                  value={propertyInfo.bedrooms || 'Not specified'}
+                  fullWidth
+                  margin="normal"
+                  InputProps={{ readOnly: true }}
+                />
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <TextField
+                  label="Bathrooms"
+                  value={propertyInfo.bathrooms || 'Not specified'}
+                  fullWidth
+                  margin="normal"
+                  InputProps={{ readOnly: true }}
+                />
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <TextField
+                  label="Square Footage"
+                  value={propertyInfo.squareFootage || 'Not specified'}
+                  fullWidth
+                  margin="normal"
+                  InputProps={{ readOnly: true }}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  label="Description"
+                  value={propertyInfo.description || 'No description provided'}
+                  fullWidth
+                  margin="normal"
+                  multiline
+                  rows={3}
+                  InputProps={{ readOnly: true }}
+                />
+              </Grid>
+            </Grid>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCancelListing} color="secondary">
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleConfirmListing} 
+            variant="contained" 
+            color="primary"
+            disabled={isCreatingListing}
+          >
+            {isCreatingListing ? <CircularProgress size={20} /> : 'Create Listing'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Listing Creation Result Alert */}
+      {listingCreationResult && (
+        <Alert 
+          severity={listingCreationResult.success ? 'success' : 'error'} 
+          sx={{ mb: 2 }}
+          onClose={() => setListingCreationResult(null)}
+        >
+          {listingCreationResult.message}
+        </Alert>
+      )}
+      
+      <Paper 
+        elevation={3} 
+        sx={{ 
+          flex: 1, 
+          display: 'flex', 
+          flexDirection: 'column',
+          overflow: 'hidden'
+        }}
+      >
+        {/* Messages Area */}
+        <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
+          <List>
+            {messages.map((message) => (
+              <ListItem
+                key={message.id}
+                sx={{
+                  flexDirection: 'column',
+                  alignItems: message.type === 'user' ? 'flex-end' : 'flex-start',
+                  mb: 1
+                }}
+              >
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    maxWidth: '70%',
+                    gap: 1
+                  }}
+                >
+                  {message.type === 'bot' && (
+                    <Avatar sx={{ bgcolor: 'primary.main', width: 32, height: 32 }}>
+                      <BotIcon />
+                    </Avatar>
+                  )}
+                  <Paper
+                    sx={{
+                      p: 2,
+                      bgcolor: message.type === 'user' ? 'primary.main' : 'grey.100',
+                      color: message.type === 'user' ? 'white' : 'text.primary',
+                      borderRadius: 2
+                    }}
+                  >
+                    <Typography variant="body1">{message.content}</Typography>
+                  </Paper>
+                  {message.type === 'user' && (
+                    <Avatar sx={{ bgcolor: 'secondary.main', width: 32, height: 32 }}>
+                      <PersonIcon />
+                    </Avatar>
+                  )}
+                </Box>
+              </ListItem>
+            ))}
+            
+            {isTyping && (
+              <ListItem sx={{ justifyContent: 'flex-start' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Avatar sx={{ bgcolor: 'primary.main', width: 32, height: 32 }}>
+                    <BotIcon />
+                  </Avatar>
+                  <CircularProgress size={20} />
+                </Box>
+              </ListItem>
+            )}
+          </List>
+          <div ref={messagesEndRef} />
+        </Box>
+
+        {/* Property Suggestions for Buyers */}
+        {suggestedProperties.length > 0 && (
+          <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
+            <Typography variant="h6" gutterBottom>Suggested Properties</Typography>
+            <Grid container spacing={2}>
+              {suggestedProperties.map((property) => (
+                <Grid item xs={12} sm={6} md={4} key={property.id}>
+                  <Card>
+                    <CardContent>
+                      <Typography variant="h6" gutterBottom>{property.address}</Typography>
+                      <Typography variant="h5" color="primary" gutterBottom>
+                        {property.price}
+                      </Typography>
+                      <Typography variant="body2" gutterBottom>
+                        {property.bedrooms} bed • {property.bathrooms} bath • {property.sqft} sqft
+                      </Typography>
+                      <Box sx={{ mt: 1 }}>
+                        {property.features && property.features.map((feature, index) => (
+                          <Chip
+                            key={index}
+                            label={feature}
+                            size="small"
+                            sx={{ mr: 0.5, mb: 0.5 }}
+                          />
+                        ))}
+                      </Box>
+                      <Button
+                        variant="contained"
+                        size="small"
+                        sx={{ mt: 1 }}
+                        onClick={() => handleViewListing(property.id)}
+                      >
+                        View Details
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+          </Box>
+        )}
+
+        {/* Input Area */}
+        <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <TextField
+              fullWidth
+              variant="outlined"
+              placeholder="Type your message..."
+              value={inputMessage}
+              onChange={(e) => setInputMessage(e.target.value)}
+              onKeyPress={handleKeyPress}
+              disabled={isTyping || !sessionId}
+            />
+            <Button
+              variant="contained"
+              onClick={handleSendButtonClick}
+              disabled={!inputMessage.trim() || isTyping || !sessionId}
+              sx={{ minWidth: 'auto', px: 2 }}
+            >
+              <SendIcon />
+            </Button>
+          </Box>
+          
+          {/* Manual property extraction trigger for sellers */}
+          {isSeller && messages.length > 2 && (
+            <Box sx={{ mt: 1, display: 'flex', justifyContent: 'center' }}>
+              <Button
+                variant="outlined"
+                size="small"
+                                 onClick={() => {
+                   const extractedInfo = checkListingReadiness(messages);
+                   if (extractedInfo) {
+                     setPropertyInfo(extractedInfo);
+                     setShowListingConfirmation(true);
+                   } else {
+                     // Show what information is missing
+                     const testInfo = extractPropertyInfoFromConversation(messages);
+                     console.log('Current extracted info:', testInfo);
+                     
+                     // Show more helpful message based on what's missing
+                     const missingFields = [];
+                     if (!testInfo?.street) missingFields.push('street address');
+                     if (!testInfo?.city) missingFields.push('city');
+                     if (!testInfo?.state) missingFields.push('state');
+                     if (!testInfo?.zip) missingFields.push('zip code');
+                     if (!testInfo?.price) missingFields.push('price');
+                     
+                     if (missingFields.length > 0) {
+                       alert(`Not enough information yet. Please provide: ${missingFields.join(', ')}.`);
+                     } else {
+                       alert('Please continue the conversation with the AI assistant to provide all required property information.');
+                     }
+                   }
+                 }}
+                sx={{ fontSize: '0.75rem' }}
+              >
+                Check if I can create a listing
+              </Button>
+            </Box>
+          )}
+        </Box>
+      </Paper>
     </Box>
   );
 };

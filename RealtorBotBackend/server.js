@@ -55,7 +55,7 @@ app.get('/test-watson', async (req, res) => {
     // Try to create collections if they don't exist
     console.log('Creating collections...');
     const usersCollection = await watsonDiscovery.ensureUsersCollection();
-    const propertiesCollection = await watsonDiscovery.createCollection(process.env.PROPERTIES_COLLECTION);
+    const propertiesCollection = await watsonDiscovery.ensurePropertiesCollection();
     const toursCollection = await watsonDiscovery.ensureToursCollection();
     
     console.log('Users collection result:', usersCollection);
@@ -76,6 +76,93 @@ app.get('/test-watson', async (req, res) => {
     console.error('Watsonx Discovery test error:', error);
     res.status(500).json({ 
       error: 'Watsonx Discovery test failed',
+      details: error.message
+    });
+  }
+});
+
+// Test Watsonx Assistant connection
+app.get('/test-assistant', async (req, res) => {
+  try {
+    console.log('Testing Watsonx Assistant connection...');
+    
+    const watsonAssistant = require('./services/watsonAssistant');
+    
+    // Test session creation
+    const sessionResult = await watsonAssistant.createSession();
+    console.log('Session creation result:', sessionResult);
+    
+    if (!sessionResult.success) {
+      return res.status(500).json({ 
+        error: 'Watsonx Assistant session creation failed',
+        details: sessionResult.error
+      });
+    }
+    
+    // Test sending a simple message
+    const messageResult = await watsonAssistant.sendMessage('Hello', sessionResult.sessionId);
+    console.log('Message result:', messageResult);
+    
+    // Clean up session
+    await watsonAssistant.deleteSession(sessionResult.sessionId);
+    
+    res.json({
+      message: 'Watsonx Assistant test completed',
+      sessionCreation: sessionResult.success,
+      messageSending: messageResult.success,
+      sessionId: sessionResult.sessionId,
+      assistantResponse: messageResult.success ? messageResult.response : null
+    });
+    
+  } catch (error) {
+    console.error('Watsonx Assistant test error:', error);
+    res.status(500).json({ 
+      error: 'Watsonx Assistant test failed',
+      details: error.message
+    });
+  }
+});
+
+// Test Watsonx Assistant message (without authentication)
+app.post('/test-assistant-message', async (req, res) => {
+  try {
+    const { message } = req.body;
+    
+    if (!message) {
+      return res.status(400).json({ error: 'Message is required' });
+    }
+    
+    console.log('Testing Watsonx Assistant message:', message);
+    
+    const watsonAssistant = require('./services/watsonAssistant');
+    
+    // Create session
+    const sessionResult = await watsonAssistant.createSession();
+    if (!sessionResult.success) {
+      return res.status(500).json({ 
+        error: 'Session creation failed',
+        details: sessionResult.error
+      });
+    }
+    
+    // Send message
+    const messageResult = await watsonAssistant.sendMessage(message, sessionResult.sessionId);
+    
+    // Clean up session
+    await watsonAssistant.deleteSession(sessionResult.sessionId);
+    
+    res.json({
+      message: 'Watsonx Assistant message test completed',
+      sessionId: sessionResult.sessionId,
+      success: messageResult.success,
+      response: messageResult.success ? messageResult.response : null,
+      error: messageResult.success ? null : messageResult.error
+    });
+    
+  } catch (error) {
+    console.error('Watsonx Assistant message test error:', error);
+    res.status(500).json({ 
+      error: 'Watsonx Assistant message test failed',
       details: error.message
     });
   }
