@@ -26,12 +26,14 @@ import {
 } from '@mui/material';
 import { Send as SendIcon, Person as PersonIcon, SmartToy as BotIcon } from '@mui/icons-material';
 import { useAuth } from '../components/AuthContext';
+import { useListings } from '../components/ListingsContext';
 import { useNavigate } from 'react-router-dom';
 import { createAssistantSession, sendAssistantMessage, deleteAssistantSession } from '../services/assistantAPI';
 import { propertiesAPI } from '../services/api';
 
 const Chat = () => {
   const { user } = useAuth();
+  const { addListing } = useListings();
   const navigate = useNavigate();
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
@@ -85,7 +87,8 @@ const Chat = () => {
     "How many bedrooms?",
     "How many bathrooms?",
     "What's the square footage?",
-    "Describe your property (features, condition, etc.)"
+    "Describe your property (features, condition, etc.)",
+    "Should I proceed to create the listing"
   ];
 
   // Check if a message contains a listing prompt
@@ -151,38 +154,46 @@ const Chat = () => {
         );
         
         if (!isTrigger) {
-          // Assign user response to the appropriate variable based on current step
-          switch (currentStep) {
-            case 0: // "I'll help you create a listing for your property"
-              variables.propertyType = message.content.trim();
-              break;
-            case 1: // "What's the street address of the property?"
-              variables.street = message.content.trim();
-              break;
-            case 2: // "What city is the property in?"
-              variables.city = message.content.trim();
-              break;
-            case 3: // "What state is the property in (e.g., NY, CA)?"
-              variables.state = message.content.trim();
-              break;
-            case 4: // "What's the ZIP code?"
-              variables.zip = message.content.trim();
-              break;
-            case 5: // "What's your asking price?"
-              variables.price = message.content.trim();
-              break;
-            case 6: // "How many bedrooms?"
-              variables.bedrooms = message.content.trim();
-              break;
-            case 7: // "How many bathrooms?"
-              variables.bathrooms = message.content.trim();
-              break;
-            case 8: // "What's the square footage?"
-              variables.squareFootage = message.content.trim();
-              break;
-            case 9: // "Describe your property (features, condition, etc.)"
-              variables.description = message.content.trim();
-              break;
+          // Skip confirmation responses (Yes/No) - they shouldn't be stored as property data
+          const isConfirmation = message.content.toLowerCase().trim() === 'yes' || message.content.toLowerCase().trim() === 'no';
+          
+          if (!isConfirmation) {
+            // Assign user response to the appropriate variable based on current step
+            switch (currentStep) {
+              case 0: // "I'll help you create a listing for your property"
+                variables.propertyType = message.content.trim();
+                break;
+              case 1: // "What's the street address of the property?"
+                variables.street = message.content.trim();
+                break;
+              case 2: // "What city is the property in?"
+                variables.city = message.content.trim();
+                break;
+              case 3: // "What state is the property in (e.g., NY, CA)?"
+                variables.state = message.content.trim();
+                break;
+              case 4: // "What's the ZIP code?"
+                variables.zip = message.content.trim();
+                break;
+              case 5: // "What's your asking price?"
+                variables.price = message.content.trim();
+                break;
+              case 6: // "How many bedrooms?"
+                variables.bedrooms = message.content.trim();
+                break;
+              case 7: // "How many bathrooms?"
+                variables.bathrooms = message.content.trim();
+                break;
+              case 8: // "What's the square footage?"
+                variables.squareFootage = message.content.trim();
+                break;
+              case 9: // "Describe your property (features, condition, etc.)"
+                variables.description = message.content.trim();
+                break;
+              case 10: // "Should I proceed to create the listing" - confirmation step
+                // Don't store confirmation responses as property data
+                break;
+            }
           }
         }
       }
@@ -194,7 +205,7 @@ const Chat = () => {
     
     // Create property info object
     const propertyInfo = {
-      title: variables.propertyType ? `${variables.propertyType} at ${variables.street || ''}` : '',
+      title: variables.propertyType || '',
       street: variables.street,
       city: variables.city,
       state: variables.state,
@@ -548,7 +559,7 @@ const Chat = () => {
       
       // Create listing data matching the exact format from successful manual creation
       const listingData = {
-        title: propertyInfo.title || `Property at ${propertyInfo.street}`,
+        title: propertyInfo.title || 'Property',
         street: propertyInfo.street,
         city: propertyInfo.city,
         state: propertyInfo.state,
@@ -568,7 +579,8 @@ const Chat = () => {
         seller_id: user.id
       });
       
-      const result = await propertiesAPI.create(listingData);
+      // Use the addListing function from ListingsContext to ensure state is updated
+      const result = await addListing(listingData);
       console.log('Listing creation result:', result);
       
       setListingCreationResult({
@@ -576,15 +588,6 @@ const Chat = () => {
         message: 'Property listing created successfully!',
         property: result
       });
-      
-      // Add success message to chat
-      const successMessage = {
-        id: Date.now(),
-        type: 'bot',
-        content: 'Great! Your property listing has been created successfully. You can view it in your seller dashboard.',
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, successMessage]);
       
       // Reset property info
       setPropertyInfo({
@@ -705,7 +708,7 @@ const Chat = () => {
               <Grid item xs={12} sm={6}>
                 <TextField
                   label="Property Type"
-                  value={propertyInfo.title ? propertyInfo.title.split(' at ')[0] : ''}
+                  value={propertyInfo.title || ''}
                   fullWidth
                   margin="normal"
                   InputProps={{ readOnly: true }}
@@ -952,7 +955,7 @@ const Chat = () => {
             >
               <SendIcon />
             </Button>
-          </Box>
+                    </Box>
           
           {/* Manual property extraction trigger for sellers */}
           {isSeller && messages.length > 2 && (
@@ -960,38 +963,38 @@ const Chat = () => {
               <Button
                 variant="outlined"
                 size="small"
-                                 onClick={() => {
-                   const extractedInfo = checkListingReadiness(messages);
-                   if (extractedInfo) {
-                     setPropertyInfo(extractedInfo);
-                     setShowListingConfirmation(true);
-                   } else {
-                     // Show what information is missing
-                     const testInfo = extractPropertyInfoFromConversation(messages);
-                     console.log('Current extracted info:', testInfo);
-                     
-                     // Show more helpful message based on what's missing
-                     const missingFields = [];
-                     if (!testInfo?.street) missingFields.push('street address');
-                     if (!testInfo?.city) missingFields.push('city');
-                     if (!testInfo?.state) missingFields.push('state');
-                     if (!testInfo?.zip) missingFields.push('zip code');
-                     if (!testInfo?.price) missingFields.push('price');
-                     
-                     if (missingFields.length > 0) {
-                       alert(`Not enough information yet. Please provide: ${missingFields.join(', ')}.`);
-                     } else {
-                       alert('Please continue the conversation with the AI assistant to provide all required property information.');
-                     }
-                   }
-                 }}
+                onClick={() => {
+                  const extractedInfo = checkListingReadiness(messages);
+                  if (extractedInfo) {
+                    setPropertyInfo(extractedInfo);
+                    setShowListingConfirmation(true);
+                  } else {
+                    // Show what information is missing
+                    const testInfo = extractPropertyInfoFromConversation(messages);
+                    console.log('Current extracted info:', testInfo);
+                    
+                    // Show more helpful message based on what's missing
+                    const missingFields = [];
+                    if (!testInfo?.street) missingFields.push('street address');
+                    if (!testInfo?.city) missingFields.push('city');
+                    if (!testInfo?.state) missingFields.push('state');
+                    if (!testInfo?.zip) missingFields.push('zip code');
+                    if (!testInfo?.price) missingFields.push('price');
+                    
+                    if (missingFields.length > 0) {
+                      alert(`Not enough information yet. Please provide: ${missingFields.join(', ')}.`);
+                    } else {
+                      alert('Please continue the conversation with the AI assistant to provide all required property information.');
+                    }
+                  }
+                }}
                 sx={{ fontSize: '0.75rem' }}
               >
                 Check if I can create a listing
               </Button>
             </Box>
           )}
-        </Box>
+          </Box>
       </Paper>
     </Box>
   );
