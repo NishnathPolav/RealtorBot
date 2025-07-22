@@ -69,6 +69,10 @@ class WatsonAssistantService {
         },
         this.getAuthConfig()
       );
+      // Print out session variables for debugging (Watsonx Assistant)
+      const context = response.data.context;
+      const sessionVars = context?.global || context || {};
+      console.log('[DEBUG] watsonAssistant.js - session variables after user response:', sessionVars);
       
       console.log('Assistant response received:', {
         hasOutput: !!response.data.output,

@@ -86,83 +86,83 @@ router.post('/message', verifyToken, async (req, res) => {
       }
     }
 
-    // Check if the assistant wants to perform an action
-    const actions = assistantResponse.output?.actions || [];
-    let actionResults = [];
-
-    console.log('Processing actions:', actions.length);
-
-    for (const action of actions) {
-      console.log('Processing action:', action.name, action.parameters);
-      
-      if (action.name === 'search_properties' && req.user.role === 'buyer') {
-        // Handle property search action
-        const searchResult = await handlePropertySearch(action.parameters, req.user);
-        actionResults.push({
-          action: 'search_properties',
-          result: searchResult
-        });
-      } else if (action.name === 'create_listing' && req.user.role === 'seller') {
-        // Handle listing creation action
-        const createResult = await handleCreateListing(action.parameters, req.user);
-        actionResults.push({
-          action: 'create_listing',
-          result: createResult
-        });
+    // --- Custom formatting for summary confirmation message ---
+    // If the responseText matches the summary pattern, reformat it
+    if (responseText && responseText.startsWith('Thank you for providing this information.')) {
+      // Extract property details using regex
+      const regex = /\*\*Property Type\*\*: ([^*]+) \*\*Street\*\*: ([^*]+) \*\*City\*\*: ([^*]+) \*\*State\*\*: ([^*]+) \*\*Zip\*\*: ([^*]+) \*\*Price\*\*: ([^*]+) \*\*Bedrooms\*\*: ([^*]+) \*\*Bathrooms\*\*: ([^*]+) \*\*Square\*\* \*\*Footage\*\*: ([^*]+) \*\*Description\*\*: ([^*]+) Should I proceed to create the listing\? \(Yes\/ No\)/;
+      const match = responseText.match(regex);
+      if (match) {
+        const [_, propertyType, street, city, state, zip, price, bedrooms, bathrooms, squareFootage, description] = match;
+        responseText =
+          'Thank you for providing this information.\n' +
+          `**Property Type**: ${propertyType.trim()}\n` +
+          `**Street**: ${street.trim()}\n` +
+          `**City**: ${city.trim()}\n` +
+          `**State**: ${state.trim()}\n` +
+          `**Zip**: ${zip.trim()}\n` +
+          `**Price**: ${price.trim()}\n` +
+          `**Bedrooms**: ${bedrooms.trim()}\n` +
+          `**Bathrooms**: ${bathrooms.trim()}\n` +
+          `**Square Footage**: ${squareFootage.trim()}\n` +
+          `**Description**: ${description.trim()}\n` +
+          'Should I proceed to create the listing? (Yes/ No)';
       }
     }
 
-    // Check if this is a confirmation response (Yes/No) for sellers
-    const isConfirmation = message.toLowerCase().trim() === 'yes' || message.toLowerCase().trim() === 'no';
-    if (isConfirmation && req.user.role === 'seller') {
-      console.log('Processing confirmation response:', message);
-      
-      // If user confirmed with "yes", proceed with listing creation using context variables
-      if (message.toLowerCase().trim() === 'yes') {
-        const context = assistantResponse.context;
-        if (context && context.variables) {
-          const variables = context.variables;
-          console.log('Processing confirmation with variables:', variables);
-          
-          // Check if we have all required variables for listing creation
-          const requiredFields = ['propertyType', 'street', 'city', 'state', 'zip', 'price'];
-          const hasAllRequired = requiredFields.every(field => variables[field]);
-          
-          if (hasAllRequired) {
-            console.log('All required fields present, creating listing');
-            const createResult = await handleCreateListing(variables, req.user);
-            if (createResult.success) {
-              actionResults.push({
-                action: 'create_listing',
-                result: createResult
-              });
-            } else {
-              console.error('Failed to create listing:', createResult.error);
-            }
-          } else {
-            console.log('Missing required fields for listing creation:', {
-              required: requiredFields,
-              present: Object.keys(variables),
-              missing: requiredFields.filter(field => !variables[field])
-            });
-          }
-        } else {
-          console.log('No context variables found for listing creation');
-        }
-      }
+    // Extract variables from Watsonx Assistant context (root level for Watsonx)
+    const userDefined = assistantResponse.context?.global || assistantResponse.context || {};
+    const requiredFields = ['propertyType', 'street', 'city', 'state', 'zip', 'price'];
+    const hasAllRequired = requiredFields.every(field => userDefined[field]);
+    if (hasAllRequired) {
+      return res.json({
+        success: true,
+        response: responseText,
+        sessionId: result.sessionId,
+        actions: [],
+        context: assistantResponse.context,
+        sessionVariables: userDefined,
+        awaitingConfirmation: true
+      });
     }
-
+    // Otherwise, normal response
     res.json({
       success: true,
       response: responseText,
       sessionId: result.sessionId,
-      actions: actionResults,
-      context: assistantResponse.context
+      actions: [],
+      context: assistantResponse.context,
+      sessionVariables: userDefined
     });
 
   } catch (error) {
     console.error('Assistant message error:', error);
     res.status(500).json({ error: 'Failed to process message' });
+  }
+});
+
+// New endpoint to create listing from session variables
+router.post('/create-listing', verifyToken, async (req, res) => {
+  try {
+    const variables = req.body;
+    const user = req.user;
+    // Validate required fields
+    const requiredFields = ['propertyType', 'street', 'city', 'state', 'zip', 'price'];
+    const hasAllRequired = requiredFields.every(field => variables[field]);
+    if (!hasAllRequired) {
+      return res.status(400).json({ error: 'Missing required fields for listing creation' });
+    }
+    const createResult = await handleCreateListing(variables, user);
+    if (!createResult.success) {
+      return res.status(500).json({ error: createResult.error });
+    }
+    res.json({
+      success: true,
+      message: createResult.message,
+      property: createResult.property
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to create property listing' });
   }
 });
 
@@ -396,4 +396,4 @@ async function handleCreateListing(parameters, user) {
   }
 }
 
-module.exports = router; 
+module.exports = router;

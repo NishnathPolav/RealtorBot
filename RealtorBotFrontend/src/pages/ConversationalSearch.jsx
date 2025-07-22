@@ -31,6 +31,18 @@ const ConversationalSearch = () => {
   const [error, setError] = useState(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const messagesEndRef = useRef(null);
+  const [form, setForm] = useState({
+    propertyType: '',
+    street: '',
+    city: '',
+    state: '',
+    zip: '',
+    price: '',
+    bedrooms: '',
+    bathrooms: '',
+    squareFootage: '',
+    description: ''
+  });
 
   const isBuyer = user?.role === 'buyer';
   const isSeller = user?.role === 'seller';
@@ -133,6 +145,10 @@ const ConversationalSearch = () => {
       // Handle any actions from the assistant
       if (response.actions && response.actions.length > 0) {
         handleAssistantActions(response.actions);
+      }
+      // If sessionVariables are present, use them to populate the form
+      if (response.sessionVariables && Object.keys(response.sessionVariables).length > 0) {
+        setForm(prev => ({ ...prev, ...response.sessionVariables }));
       }
       
     } catch (error) {

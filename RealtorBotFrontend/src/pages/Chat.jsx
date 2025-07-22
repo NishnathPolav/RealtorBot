@@ -30,6 +30,7 @@ import { useListings } from '../components/ListingsContext';
 import { useNavigate } from 'react-router-dom';
 import { createAssistantSession, sendAssistantMessage, deleteAssistantSession } from '../services/assistantAPI';
 import { propertiesAPI } from '../services/api';
+import { getAuthToken } from '../services/api';
 
 const Chat = () => {
   const { user } = useAuth();
@@ -43,6 +44,7 @@ const Chat = () => {
   const [error, setError] = useState(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [baseMessageAdded, setBaseMessageAdded] = useState(false);
+  const [pendingSessionVariables, setPendingSessionVariables] = useState(null);
   
   // Property listing creation state
   const [propertyInfo, setPropertyInfo] = useState({
@@ -465,25 +467,61 @@ const Chat = () => {
       
       // Only add assistant response if there's actual content
       let botMessage = null;
-      if (responseText) {
+      // --- Intercept summary confirmation message ---
+      if (responseText && responseText.startsWith('Thank you for providing this information')) {
+        // Remove the greeting and any leading blank lines before parsing fields
+        const propertyBlock = responseText.replace(/^Thank you for providing this information\.?[\s\S]*?/i, '').trimStart();
+        // Clean bold markers and carriage returns
+        const cleanBlock = propertyBlock.replace(/\*\*/g, '').replace(/\r/g, '');
+        // Split into non-empty lines
+        const lines = cleanBlock.split(/\n+/).map(l => l.trim()).filter(l => l && !/^Should I proceed/i.test(l));
+        const fieldMap = {};
+        lines.forEach(line => {
+          const parts = line.split(/:\s*/, 2);
+          if (parts.length === 2) {
+            const label = parts[0].toLowerCase();
+            const value = parts[1].trim();
+            fieldMap[label] = value;
+          }
+        });
+        const extractedVars = {
+          propertyType: fieldMap['property type'] || '',
+          street: fieldMap['street'] || '',
+          city: fieldMap['city'] || '',
+          state: fieldMap['state'] || '',
+          zip: fieldMap['zip'] || '',
+          price: fieldMap['price'] || '',
+          bedrooms: fieldMap['bedrooms'] || '',
+          bathrooms: fieldMap['bathrooms'] || '',
+          squareFootage: fieldMap['square footage'] || fieldMap['square footage'] || '',
+          description: fieldMap['description'] || '',
+        };
+        const hasSome = Object.values(extractedVars).some(v => v);
+        if (hasSome) {
+          extractedVars.title = extractedVars.propertyType ? `${extractedVars.propertyType} at ${extractedVars.street || ''}` : '';
+          setPropertyInfo(extractedVars);
+          setPendingSessionVariables(extractedVars);
+        } else {
+          // Fallback
+          setPropertyInfo({
+            title: '', street: '', city: '', state: '', zip: '', price: '', bedrooms: '', bathrooms: '', squareFootage: '', description: cleanBlock
+          });
+          setPendingSessionVariables(null);
+        }
+        setShowListingConfirmation(true);
+        // Do NOT add the summary message to the chat
+      } else if (responseText) {
         botMessage = {
           id: Date.now(),
           type: 'bot',
           content: responseText,
           timestamp: new Date()
         };
-        
-        console.log('Adding bot message to chat:', botMessage);
         setMessages(prev => {
-          console.log('Current messages before adding bot message:', prev);
           const newMessages = [...prev, botMessage];
-          console.log('Messages after adding bot message:', newMessages);
           return newMessages;
         });
-        console.log('Added bot message to chat');
       } else {
-        console.log('No response text found, not adding bot message');
-        // Add a fallback message for debugging
         botMessage = {
           id: Date.now(),
           type: 'bot',
@@ -491,9 +529,7 @@ const Chat = () => {
           timestamp: new Date()
         };
         setMessages(prev => {
-          console.log('Current messages before adding fallback message:', prev);
           const newMessages = [...prev, botMessage];
-          console.log('Messages after adding fallback message:', newMessages);
           return newMessages;
         });
       }
@@ -503,26 +539,16 @@ const Chat = () => {
         console.log('Processing actions:', response.actions);
         handleAssistantActions(response.actions);
       }
-      
-      // Check for property information in conversation (for sellers)
-      if (isSeller) {
-        // Extract from conversation messages using the new flow-based approach
-        const updatedMessages = [...messages, userMessage];
-        if (botMessage) {
-          updatedMessages.push(botMessage);
-        }
-        
-        const extractedInfo = checkListingReadiness(updatedMessages);
-        
-        if (extractedInfo) {
-          console.log('Extracted property info:', extractedInfo);
-          setPropertyInfo(extractedInfo);
-          
-          // Show confirmation dialog if not already shown
-          if (!showListingConfirmation) {
-            setShowListingConfirmation(true);
-          }
-        }
+      // Use sessionVariables from backend to populate propertyInfo and show confirmation if awaitingConfirmation
+      if (response.awaitingConfirmation && response.sessionVariables && Object.keys(response.sessionVariables).length > 0) {
+        setPropertyInfo({
+          ...response.sessionVariables,
+          title: response.sessionVariables.propertyType
+            ? `${response.sessionVariables.propertyType} at ${response.sessionVariables.street || ''}`
+            : '',
+        });
+        setPendingSessionVariables(response.sessionVariables);
+        setShowListingConfirmation(true);
       }
       
     } catch (error) {
@@ -552,61 +578,30 @@ const Chat = () => {
   const handleConfirmListing = async () => {
     setIsCreatingListing(true);
     setShowListingConfirmation(false);
-    
     try {
-      // Format price (remove currency symbols and commas) - match the manual form format
-      const cleanPrice = propertyInfo.price.toString().replace(/[$,€£¥\s]/g, '');
-      
-      // Create listing data matching the exact format from successful manual creation
-      const listingData = {
-        title: propertyInfo.title || 'Property',
-        street: propertyInfo.street,
-        city: propertyInfo.city,
-        state: propertyInfo.state,
-        zip: propertyInfo.zip,
-        price: parseInt(cleanPrice),
-        description: propertyInfo.description || ''
-      };
-      
-      console.log('Creating listing with data:', listingData);
-      console.log('Create property attempt:', {
-        title: listingData.title,
-        street: listingData.street,
-        city: listingData.city,
-        state: listingData.state,
-        zip: listingData.zip,
-        price: listingData.price,
-        seller_id: user.id
+      // Send session variables to backend to create the listing
+      const token = getAuthToken();
+      const res = await fetch('http://localhost:5001/api/assistant/create-listing', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { Authorization: `Bearer ${token}` })
+        },
+        body: JSON.stringify(pendingSessionVariables)
       });
-      
-      // Use the addListing function from ListingsContext to ensure state is updated
-      const result = await addListing(listingData);
-      console.log('Listing creation result:', result);
-      
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to create listing');
       setListingCreationResult({
         success: true,
-        message: 'Property listing created successfully!',
-        property: result
+        message: data.message,
+        property: data.property
       });
-      
-      // Reset property info
-      setPropertyInfo({
-        title: '',
-        street: '',
-        city: '',
-        state: '',
-        zip: '',
-        price: '',
-        description: ''
-      });
-      
+      // Optionally, refresh listings or dashboard here
     } catch (error) {
-      console.error('Failed to create listing:', error);
       setListingCreationResult({
         success: false,
         message: `Failed to create listing: ${error.message}`
       });
-      
       // Add error message to chat
       const errorMessage = {
         id: Date.now(),
@@ -617,6 +612,7 @@ const Chat = () => {
       setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsCreatingListing(false);
+      setPendingSessionVariables(null);
     }
   };
 
@@ -964,27 +960,41 @@ const Chat = () => {
                 variant="outlined"
                 size="small"
                 onClick={() => {
-                  const extractedInfo = checkListingReadiness(messages);
-                  if (extractedInfo) {
-                    setPropertyInfo(extractedInfo);
+                  // Prefer sessionVariables if available
+                  const lastSessionVars = messages
+                    .map(m => m.sessionVariables)
+                    .filter(Boolean)
+                    .pop();
+                  if (lastSessionVars && Object.keys(lastSessionVars).length > 0) {
+                    setPropertyInfo({
+                      ...lastSessionVars,
+                      title: lastSessionVars.propertyType
+                        ? `${lastSessionVars.propertyType} at ${lastSessionVars.street || ''}`
+                        : '',
+                    });
                     setShowListingConfirmation(true);
                   } else {
-                    // Show what information is missing
-                    const testInfo = extractPropertyInfoFromConversation(messages);
-                    console.log('Current extracted info:', testInfo);
-                    
-                    // Show more helpful message based on what's missing
-                    const missingFields = [];
-                    if (!testInfo?.street) missingFields.push('street address');
-                    if (!testInfo?.city) missingFields.push('city');
-                    if (!testInfo?.state) missingFields.push('state');
-                    if (!testInfo?.zip) missingFields.push('zip code');
-                    if (!testInfo?.price) missingFields.push('price');
-                    
-                    if (missingFields.length > 0) {
-                      alert(`Not enough information yet. Please provide: ${missingFields.join(', ')}.`);
+                    // Fallback to old extraction if no sessionVariables
+                    const extractedInfo = checkListingReadiness(messages);
+                    if (extractedInfo) {
+                      setPropertyInfo(extractedInfo);
+                      setShowListingConfirmation(true);
                     } else {
-                      alert('Please continue the conversation with the AI assistant to provide all required property information.');
+                      // Show what information is missing
+                      const testInfo = extractPropertyInfoFromConversation(messages);
+                      console.log('Current extracted info:', testInfo);
+                      // Show more helpful message based on what's missing
+                      const missingFields = [];
+                      if (!testInfo?.street) missingFields.push('street address');
+                      if (!testInfo?.city) missingFields.push('city');
+                      if (!testInfo?.state) missingFields.push('state');
+                      if (!testInfo?.zip) missingFields.push('zip code');
+                      if (!testInfo?.price) missingFields.push('price');
+                      if (missingFields.length > 0) {
+                        alert(`Not enough information yet. Please provide: ${missingFields.join(', ')}.`);
+                      } else {
+                        alert('Please continue the conversation with the AI assistant to provide all required property information.');
+                      }
                     }
                   }
                 }}
