@@ -96,6 +96,21 @@ const ListingDetails = () => {
           <Typography variant="subtitle1" gutterBottom>Status: {listing.status}</Typography>
           <Typography variant="body1" gutterBottom>Address: {[listing.street, listing.city, listing.state, listing.zip].filter(Boolean).join(', ')}</Typography>
           <Typography variant="body1" gutterBottom>Price: {formatPrice(listing.price)}</Typography>
+          {(listing.bedrooms || listing.bedrooms === 0) && (
+            <Typography variant="body1" gutterBottom>
+              Bedrooms: {listing.bedrooms}
+            </Typography>
+          )}
+          {(listing.bathrooms || listing.bathrooms === 0) && (
+            <Typography variant="body1" gutterBottom>
+              Bathrooms: {listing.bathrooms}
+            </Typography>
+          )}
+          {(listing.squareFootage || listing.squareFootage === 0) && (
+            <Typography variant="body1" gutterBottom>
+              Square Footage: {listing.squareFootage.toLocaleString()} sq ft
+            </Typography>
+          )}
           <Typography variant="body1" gutterBottom>Description: {listing.description}</Typography>
           {listing.features && listing.features.length > 0 && (
             <Typography variant="body1" gutterBottom>

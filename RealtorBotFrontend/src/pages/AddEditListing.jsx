@@ -28,6 +28,9 @@ const AddEditListing = () => {
     state: '',
     zip: '',
     price: '', // Store raw number as string
+    bedrooms: '',
+    bathrooms: '',
+    squareFootage: '',
     description: '',
     photo: null,
   });
@@ -46,6 +49,9 @@ const AddEditListing = () => {
             state: listing.state || '',
             zip: listing.zip || '',
             price: listing.price || '',
+            bedrooms: listing.bedrooms || '',
+            bathrooms: listing.bathrooms || '',
+            squareFootage: listing.squareFootage || '',
             description: listing.description || '',
             photo: null,
           });
@@ -200,6 +206,36 @@ const AddEditListing = () => {
           name="price"
           type="text"
           value={displayPrice}
+          onChange={handleChange}
+          fullWidth
+          margin="normal"
+          required
+        />
+        <TextField
+          label="Bedrooms"
+          name="bedrooms"
+          type="number"
+          value={form.bedrooms}
+          onChange={handleChange}
+          fullWidth
+          margin="normal"
+          required
+        />
+        <TextField
+          label="Bathrooms"
+          name="bathrooms"
+          type="number"
+          value={form.bathrooms}
+          onChange={handleChange}
+          fullWidth
+          margin="normal"
+          required
+        />
+        <TextField
+          label="Square Footage"
+          name="squareFootage"
+          type="number"
+          value={form.squareFootage}
           onChange={handleChange}
           fullWidth
           margin="normal"

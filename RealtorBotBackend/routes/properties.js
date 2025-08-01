@@ -69,6 +69,9 @@ router.get('/', async (req, res) => {
       state: hit._source.state,
       zip: hit._source.zip,
       price: hit._source.price,
+      bedrooms: hit._source.bedrooms,
+      bathrooms: hit._source.bathrooms,
+      squareFootage: hit._source.squareFootage,
       description: hit._source.description,
       status: hit._source.status,
       seller_id: hit._source.seller_id,
@@ -117,6 +120,9 @@ router.get('/:id', async (req, res) => {
       state: property.state,
       zip: property.zip,
       price: property.price,
+      bedrooms: property.bedrooms,
+      bathrooms: property.bathrooms,
+      squareFootage: property.squareFootage,
       description: property.description,
       status: property.status,
       seller_id: property.seller_id,
@@ -134,13 +140,18 @@ router.get('/:id', async (req, res) => {
 // Create new property (requires authentication)
 router.post('/', verifyToken, async (req, res) => {
   try {
-    const { title, street, city, state, zip, price, description, features = [] } = req.body;
-    console.log('Create property attempt:', { title, street, city, state, zip, price, seller_id: req.user.id });
+    const { title, street, city, state, zip, price, bedrooms, bathrooms, squareFootage, description, features = [] } = req.body;
+    console.log('Create property attempt:', { title, street, city, state, zip, price, bedrooms, bathrooms, squareFootage, seller_id: req.user.id });
 
     if (!title || !street || !city || !state || !zip || !price) {
       console.log('Missing required fields:', { title: !!title, street: !!street, city: !!city, state: !!state, zip: !!zip, price: !!price });
       return res.status(400).json({ error: 'Title, street, city, state, zip, and price are required' });
     }
+
+    // Convert numeric fields to integers
+    const cleanBedrooms = bedrooms ? parseInt(bedrooms) : 0;
+    const cleanBathrooms = bathrooms ? parseInt(bathrooms) : 0;
+    const cleanSquareFootage = squareFootage ? parseInt(squareFootage) : 0;
 
     // Create property document
     const newProperty = {
@@ -151,6 +162,9 @@ router.post('/', verifyToken, async (req, res) => {
       state,
       zip,
       price: parseInt(price),
+      bedrooms: cleanBedrooms,
+      bathrooms: cleanBathrooms,
+      squareFootage: cleanSquareFootage,
       description: description || '',
       features,
       status: 'active',
@@ -159,7 +173,7 @@ router.post('/', verifyToken, async (req, res) => {
       updated_at: new Date().toISOString()
     };
 
-    console.log('Creating new property:', { id: newProperty.id, title: newProperty.title });
+    console.log('Creating new property:', { id: newProperty.id, title: newProperty.title, bedrooms: newProperty.bedrooms, bathrooms: newProperty.bathrooms, squareFootage: newProperty.squareFootage });
 
     // Index property in Watsonx Discovery
     const result = await watsonDiscovery.indexDocument(
@@ -186,6 +200,9 @@ router.post('/', verifyToken, async (req, res) => {
         state: newProperty.state,
         zip: newProperty.zip,
         price: newProperty.price,
+        bedrooms: newProperty.bedrooms,
+        bathrooms: newProperty.bathrooms,
+        squareFootage: newProperty.squareFootage,
         description: newProperty.description,
         status: newProperty.status,
         seller_id: newProperty.seller_id
@@ -340,6 +357,9 @@ router.get('/seller/my-properties', verifyToken, async (req, res) => {
       state: hit._source.state,
       zip: hit._source.zip,
       price: hit._source.price,
+      bedrooms: hit._source.bedrooms,
+      bathrooms: hit._source.bathrooms,
+      squareFootage: hit._source.squareFootage,
       description: hit._source.description,
       status: hit._source.status,
       created_at: hit._source.created_at
