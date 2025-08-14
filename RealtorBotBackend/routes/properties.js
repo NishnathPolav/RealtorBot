@@ -21,8 +21,8 @@ const verifyToken = (req, res, next) => {
   }
 };
 
-// Get all properties (with optional search and filters)
-router.get('/', async (req, res) => {
+  // Get all properties (with optional search and filters)
+  router.get('/', async (req, res) => {
   try {
     const { 
       search = '', 
@@ -64,6 +64,7 @@ router.get('/', async (req, res) => {
     const properties = result.data.hits.hits.map(hit => ({
       id: hit._source.id,
       title: hit._source.title,
+      propertyType: hit._source.propertyType,
       street: hit._source.street,
       city: hit._source.city,
       state: hit._source.state,

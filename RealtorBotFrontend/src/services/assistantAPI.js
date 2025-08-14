@@ -76,3 +76,21 @@ export const deleteAssistantSession = async (sessionId) => {
     throw error;
   }
 }; 
+
+// Call TechZone property search webhook after buyer conversations
+export const searchTechZoneProperties = async (query, filters = {}) => {
+  try {
+    console.log('Calling TechZone search webhook:', { query, filters });
+    
+    const response = await makeAuthenticatedRequest('/assistant/webhook/techzone-search', {
+      method: 'POST',
+      body: JSON.stringify({ query, filters }),
+    });
+
+    console.log('TechZone search response:', response);
+    return response;
+  } catch (error) {
+    console.error('Error calling TechZone search webhook:', error);
+    throw error;
+  }
+}; 

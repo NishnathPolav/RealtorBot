@@ -371,6 +371,110 @@ class WatsonDiscoveryService {
       return { success: false, error: error.message };
     }
   }
+
+  // Search properties in TechZone Watsonx Discovery (external collection)
+  async searchTechZoneProperties(query, filters = {}) {
+    try {
+      console.log('Searching TechZone properties with query:', query, 'filters:', filters);
+      
+      // Use the same client since TechZone and local are the same instance
+      // The difference is in the search parameters and collection
+      const searchBody = {
+        query: {
+          bool: {
+            must: [
+              {
+                multi_match: {
+                  query: query,
+                  fields: ['title^2', 'description', 'address', 'features', 'propertyType']
+                }
+              }
+            ],
+            filter: []
+          }
+        },
+        sort: [
+          { '_score': { order: 'desc' } },
+          { 'created_at': { order: 'desc' } }
+        ],
+        size: 10
+      };
+
+      // Add filters for TechZone properties
+      if (filters.price_min || filters.price_max) {
+        const priceFilter = { range: { price: {} } };
+        if (filters.price_min) priceFilter.range.price.gte = filters.price_min;
+        if (filters.price_max) priceFilter.range.price.lte = filters.price_max;
+        searchBody.query.bool.filter.push(priceFilter);
+      }
+
+      if (filters.bedrooms_min) {
+        searchBody.query.bool.filter.push({ 
+          range: { bedrooms: { gte: filters.bedrooms_min } } 
+        });
+      }
+
+      if (filters.bathrooms_min) {
+        searchBody.query.bool.filter.push({ 
+          range: { bathrooms: { gte: filters.bathrooms_min } } 
+        });
+      }
+
+      if (filters.location) {
+        searchBody.query.bool.must.push({
+          multi_match: {
+            query: filters.location,
+            fields: ['city', 'state', 'zip', 'address']
+          }
+        });
+      }
+
+      console.log('TechZone search body:', JSON.stringify(searchBody, null, 2));
+
+      // Use the same client but search in the properties collection
+      const response = await this.client.post(`/properties/_search`, searchBody);
+      
+      console.log('TechZone search response:', {
+        total: response.data.hits.total.value,
+        hits: response.data.hits.hits.length
+      });
+
+      // Format the results for frontend consumption
+      const properties = response.data.hits.hits.map(hit => {
+        const source = hit._source;
+        return {
+          id: source.id,
+          title: source.title || `${source.propertyType || 'Property'} at ${source.address || 'Unknown Address'}`,
+          address: source.address,
+          street: source.street,
+          city: source.city,
+          state: source.state,
+          zip: source.zip,
+          price: source.price,
+          bedrooms: source.bedrooms || 0,
+          bathrooms: source.bathrooms || 0,
+          squareFootage: source.squareFootage || 0,
+          description: source.description,
+          propertyType: source.propertyType,
+          features: source.features || [],
+          status: source.status || 'active',
+          score: hit._score,
+          source: 'techzone' // Mark as external source
+        };
+      });
+
+      return { 
+        success: true, 
+        data: {
+          properties,
+          total: response.data.hits.total.value
+        }
+      };
+    } catch (error) {
+      console.error('TechZone property search failed:', error.message);
+      return { success: false, error: error.message };
+    }
+  }
 }
 
 module.exports = new WatsonDiscoveryService(); 

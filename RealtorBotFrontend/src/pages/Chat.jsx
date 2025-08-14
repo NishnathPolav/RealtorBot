@@ -32,7 +32,41 @@ import { createAssistantSession, sendAssistantMessage, deleteAssistantSession } 
 import { propertiesAPI } from '../services/api';
 import { getAuthToken } from '../services/api';
 
-const Chat = () => {
+// Test function to manually trigger property search
+const testPropertySearch = async () => {
+  try {
+    const token = localStorage.getItem('token');
+    const response = await fetch('http://localhost:5001/api/assistant/test-search', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        query: '3 bedroom house in Dallas',
+        filters: {
+          price_max: 500000,
+          bedrooms_min: 3,
+          location: 'Dallas'
+        }
+      })
+    });
+    
+    const data = await response.json();
+    console.log('Test search response:', data);
+    
+    if (data.success && data.searchResult.success) {
+      setSuggestedProperties(data.searchResult.properties || []);
+      console.log('Test search successful, properties:', data.searchResult.properties);
+    } else {
+      console.error('Test search failed:', data);
+    }
+  } catch (error) {
+    console.error('Test search error:', error);
+  }
+};
+
+const Chat = ({ onClose }) => {
   const { user } = useAuth();
   const { addListing } = useListings();
   const navigate = useNavigate();
@@ -45,6 +79,8 @@ const Chat = () => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [baseMessageAdded, setBaseMessageAdded] = useState(false);
   const [pendingSessionVariables, setPendingSessionVariables] = useState(null);
+  const [searchParameters, setSearchParameters] = useState(null);
+  const [showDashboardPrompt, setShowDashboardPrompt] = useState(false);
   
   // Property listing creation state
   const [propertyInfo, setPropertyInfo] = useState({
@@ -112,6 +148,52 @@ const Chat = () => {
     ];
     
     return listingKeywords.some(keyword => conversationText.includes(keyword));
+  };
+
+  // Parse a textual summary like:
+  // "Searching for properties with budget: 500000; location: Irving; bathrooms: 5; bedrooms: 4; type: House"
+  // and return dashboard filters
+  const parseDashboardFiltersFromSummary = (text) => {
+    if (!text || typeof text !== 'string') return null;
+    // Do not require a specific prefix; try to parse key:value pairs
+
+    const pairs = {};
+    // Support synonyms/variants and separators (semicolon, comma)
+    const regex = /(budget range|budget|price|max budget|location|city|bathrooms|bathroom|bedrooms|bedroom|type|property type)\s*:\s*([^;,\n]+)/gi;
+    let match;
+    while ((match = regex.exec(text)) !== null) {
+      const key = match[1].toLowerCase().trim();
+      const value = match[2].trim();
+      pairs[key] = value;
+    }
+
+    const foundKeys = Object.keys(pairs);
+    if (foundKeys.length === 0) return null;
+
+    const rawBudget = pairs['budget range'] || pairs.budget || pairs.price || pairs['max budget'] || '';
+    const budgetNum = rawBudget ? rawBudget.toString().replace(/[^\d]/g, '') : '';
+    const bedroomsRaw = pairs.bedrooms || pairs.bedroom || '';
+    const bathroomsRaw = pairs.bathrooms || pairs.bathroom || '';
+    const bedroomsNum = bedroomsRaw ? bedroomsRaw.toString().replace(/[^\d]/g, '') : '';
+    const bathroomsNum = bathroomsRaw ? bathroomsRaw.toString().replace(/[^\d]/g, '') : '';
+    const propertyType = pairs.type || pairs['property type'] || '';
+    const location = pairs.location || pairs.city || '';
+
+    const filters = {
+      location,
+      priceMin: '',
+      priceMax: budgetNum || '',
+      bedrooms: bedroomsNum || '',
+      bathrooms: bathroomsNum || '',
+      propertyType
+    };
+    // Require at least 2 meaningful criteria to reduce false positives
+    const criteriaCount = [filters.location, filters.priceMax, filters.bedrooms, filters.bathrooms, filters.propertyType]
+      .filter(v => v && v.toString().trim() !== '').length;
+    if (criteriaCount >= 2) {
+      return filters;
+    }
+    return null;
   };
 
   // Extract property information based on conversation flow
@@ -368,7 +450,27 @@ const Chat = () => {
     
     actions.forEach(action => {
       if (action.action === 'search_properties' && action.result.success) {
+        console.log('Setting suggested properties from action:', action.result.properties);
         setSuggestedProperties(action.result.properties || []);
+        
+        // Add a message showing search results
+        if (action.result.properties && action.result.properties.length > 0) {
+          const searchMessage = {
+            id: Date.now(),
+            type: 'bot',
+            content: `I found ${action.result.properties.length} properties matching your criteria. Here are the results:`,
+            timestamp: new Date()
+          };
+          setMessages(prev => [...prev, searchMessage]);
+        } else {
+          const noResultsMessage = {
+            id: Date.now(),
+            type: 'bot',
+            content: `I couldn't find any properties matching your criteria. Try adjusting your search parameters.`,
+            timestamp: new Date()
+          };
+          setMessages(prev => [...prev, noResultsMessage]);
+        }
       } else if (action.action === 'create_listing' && action.result.success) {
         // Clear any suggested properties since this is for sellers
         setSuggestedProperties([]);
@@ -467,6 +569,13 @@ const Chat = () => {
       
       // Only add assistant response if there's actual content
       let botMessage = null;
+      // Always intercept "searching for properties" messages and redirect
+      if (responseText && responseText.toLowerCase().includes('searching for properties')) {
+        const dashboardFilters = parseDashboardFiltersFromSummary(responseText) || {};
+        setSearchParameters(dashboardFilters);
+        setShowDashboardPrompt(true);
+        return;
+      }
       // --- Intercept summary confirmation message ---
       if (responseText && responseText.startsWith('Thank you for providing this information')) {
         // Remove the greeting and any leading blank lines before parsing fields
@@ -511,6 +620,20 @@ const Chat = () => {
         setShowListingConfirmation(true);
         // Do NOT add the summary message to the chat
       } else if (responseText) {
+        // Intercept and auto-redirect if the assistant printed a search summary line
+        const dashboardFilters = parseDashboardFiltersFromSummary(responseText);
+        if (dashboardFilters) {
+          setSearchParameters(dashboardFilters);
+          // Navigate immediately without adding the summary message to chat
+          const queryParams = new URLSearchParams();
+          Object.entries(dashboardFilters).forEach(([key, value]) => {
+            if (value && value.toString().trim() !== '') {
+              queryParams.append(key, value);
+            }
+          });
+          setShowDashboardPrompt(true);
+          return; // Stop further handling of this response
+        } else {
         botMessage = {
           id: Date.now(),
           type: 'bot',
@@ -521,6 +644,7 @@ const Chat = () => {
           const newMessages = [...prev, botMessage];
           return newMessages;
         });
+        }
       } else {
         botMessage = {
           id: Date.now(),
@@ -534,11 +658,41 @@ const Chat = () => {
         });
       }
       
-      // Handle any actions from the assistant
+      // If assistant provides actions, do not perform backend search; just prompt to redirect
       if (response.actions && response.actions.length > 0) {
-        console.log('Processing actions:', response.actions);
-        handleAssistantActions(response.actions);
+        console.log('Assistant returned actions:', response.actions);
+        // Extract variables to build dashboard filters and prompt redirect
+        const searchParams = response.sessionVariables || {};
+        const dashboardFilters = {
+          location: searchParams.location || searchParams.searchQuery || '',
+          priceMin: searchParams.budget ? searchParams.budget.toString().replace(/[^\d]/g, '') : '',
+          priceMax: searchParams.budget ? searchParams.budget.toString().replace(/[^\d]/g, '') : '',
+          bedrooms: searchParams.bedrooms || '',
+          bathrooms: searchParams.bathrooms || '',
+          propertyType: searchParams.propertyType || ''
+        };
+        setSearchParameters(dashboardFilters);
+        setShowDashboardPrompt(true);
       }
+      // If sessionVariables exist without actions, prompt to redirect
+      else if (response.sessionVariables && Object.keys(response.sessionVariables).length > 0) {
+        const v = response.sessionVariables;
+        const dashboardFilters = {
+          location: v.location || v.searchQuery || '',
+          priceMin: v.budget ? v.budget.toString().replace(/[^\d]/g, '') : '',
+          priceMax: v.budget ? v.budget.toString().replace(/[^\d]/g, '') : '',
+          bedrooms: v.bedrooms || '',
+          bathrooms: v.bathrooms || '',
+          propertyType: v.propertyType || ''
+        };
+        const hasAny = Object.values(dashboardFilters).some(val => val && val.toString().trim() !== '');
+        if (hasAny) {
+          setSearchParameters(dashboardFilters);
+          setShowDashboardPrompt(true);
+          return;
+        }
+      }
+      
       // Use sessionVariables from backend to populate propertyInfo and show confirmation if awaitingConfirmation
       if (response.awaitingConfirmation && response.sessionVariables && Object.keys(response.sessionVariables).length > 0) {
         setPropertyInfo({
@@ -633,6 +787,31 @@ const Chat = () => {
     navigate(`/listing/${listingId}`);
   };
 
+  const buildDashboardUrl = () => {
+    const queryParams = new URLSearchParams();
+    if (searchParameters) {
+      Object.entries(searchParameters).forEach(([key, value]) => {
+        if (value && value.toString().trim() !== '') {
+          queryParams.append(key, value);
+        }
+      });
+    }
+    return `/buyer-dashboard${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+  };
+
+  const navigateToDashboardWithFilters = () => {
+    const url = buildDashboardUrl();
+    console.log('Navigating to dashboard:', url, 'with filters:', searchParameters);
+    navigate(url, { replace: false });
+    // Fallback in case navigation is blocked for any reason
+    setTimeout(() => {
+      if (window.location.pathname === '/chat') {
+        console.log('Fallback navigation via window.location.assign to', url);
+        window.location.assign(url);
+      }
+    }, 50);
+  };
+
   const handleKeyPress = (e) => {
     console.log('Key pressed:', e.key);
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -680,11 +859,52 @@ const Chat = () => {
         AI Property Assistant
       </Typography>
       
+      {/* Test button for buyers */}
+      {user && user.role === 'buyer' && (
+        <Box sx={{ mb: 2 }}>
+          <Button 
+            variant="outlined" 
+            color="secondary" 
+            onClick={testPropertySearch}
+            size="small"
+          >
+            Test Property Search
+          </Button>
+        </Box>
+      )}
+      
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
         </Alert>
       )}
+
+      {/* Prompt to view results in dashboard */}
+      <Dialog open={!!showDashboardPrompt} onClose={() => setShowDashboardPrompt(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>View Results in Dashboard</DialogTitle>
+        <DialogContent>
+          <Typography variant="body1">
+            I’ve applied your preferences. Would you like to open the Buyer Dashboard to see the listings?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowDashboardPrompt(false)}>
+            Stay Here
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => {
+              setShowDashboardPrompt(false);
+              if (onClose) {
+                try { onClose(); } catch (_) {}
+              }
+              navigateToDashboardWithFilters();
+            }}
+          >
+            Open Dashboard
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Property Listing Confirmation Dialog */}
       <Dialog 
@@ -865,6 +1085,18 @@ const Chat = () => {
                     }}
                   >
                     <Typography variant="body1">{message.content}</Typography>
+                    {message.hasAction && (
+                      <Box sx={{ mt: 2 }}>
+                        <Button
+                          variant="contained"
+                          color="primary"
+                          size="small"
+                          onClick={navigateToDashboardWithFilters}
+                        >
+                          View in Dashboard
+                        </Button>
+                      </Box>
+                    )}
                   </Paper>
                   {message.type === 'user' && (
                     <Avatar sx={{ bgcolor: 'secondary.main', width: 32, height: 32 }}>

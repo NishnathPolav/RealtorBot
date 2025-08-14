@@ -112,9 +112,21 @@ router.post('/message', verifyToken, async (req, res) => {
 
     // Extract variables from Watsonx Assistant context (root level for Watsonx)
     const userDefined = assistantResponse.context?.global || assistantResponse.context || {};
+    
+    console.log('=== ASSISTANT DEBUG ===');
+    console.log('User role:', req.user.role);
+    console.log('User defined variables:', userDefined);
+    console.log('All context keys:', Object.keys(assistantResponse.context || {}));
+    
+    // Check if this is a seller creating a listing
     const requiredFields = ['propertyType', 'street', 'city', 'state', 'zip', 'price'];
     const hasAllRequired = requiredFields.every(field => userDefined[field]);
-    if (hasAllRequired) {
+    console.log('Has all required fields for seller:', hasAllRequired);
+    console.log('=== END DEBUG ===');
+    
+    // Handle seller listing creation
+    if (hasAllRequired && req.user.role === 'seller') {
+      console.log('Processing seller listing creation');
       return res.json({
         success: true,
         response: responseText,
@@ -125,12 +137,29 @@ router.post('/message', verifyToken, async (req, res) => {
         awaitingConfirmation: true
       });
     }
+    
+    // Pass through assistant actions if present
+    const assistantActions = (assistantResponse.output && assistantResponse.output.actions) || [];
+    const hasSearchAction = assistantActions.some(a => a.name === 'search_properties' || a.action === 'search_properties');
+    if (hasSearchAction && req.user.role === 'buyer') {
+      console.log('Assistant action search_properties detected, returning variables for frontend redirect');
+      return res.json({
+        success: true,
+        response: responseText,
+        sessionId: result.sessionId,
+        actions: assistantActions,
+        context: assistantResponse.context,
+        sessionVariables: userDefined,
+      });
+    }
+    
     // Otherwise, normal response
+    console.log('Returning normal response');
     res.json({
       success: true,
       response: responseText,
       sessionId: result.sessionId,
-      actions: [],
+      actions: assistantActions,
       context: assistantResponse.context,
       sessionVariables: userDefined
     });
@@ -183,6 +212,163 @@ router.delete('/session/:sessionId', verifyToken, async (req, res) => {
     res.status(500).json({ error: 'Failed to delete assistant session' });
   }
 });
+
+// Webhook endpoint for TechZone property search (called after buyer conversations)
+router.post('/webhook/techzone-search', verifyToken, async (req, res) => {
+  try {
+    const { query, filters = {}, userContext = {} } = req.body;
+    
+    console.log('TechZone search webhook called:', {
+      query,
+      filters,
+      user_id: req.user.id,
+      user_role: req.user.role
+    });
+
+    if (!query) {
+      return res.status(400).json({ error: 'Search query is required' });
+    }
+
+    // Search properties in TechZone Watsonx Discovery
+    const result = await watsonDiscovery.searchTechZoneProperties(query, filters);
+    
+    if (!result.success) {
+      console.error('TechZone search failed:', result.error);
+      return res.status(500).json({ error: 'Failed to search TechZone properties' });
+    }
+
+    console.log(`Found ${result.data.properties.length} TechZone properties`);
+
+    res.json({
+      success: true,
+      properties: result.data.properties,
+      total: result.data.total,
+      query,
+      filters
+    });
+
+  } catch (error) {
+    console.error('TechZone search webhook error:', error);
+    res.status(500).json({ error: 'Failed to process TechZone search' });
+  }
+});
+
+// Enhanced property search action for buyers (includes TechZone search)
+async function handleBuyerPropertySearch(parameters, user) {
+  try {
+    console.log('Handling buyer property search with parameters:', parameters);
+    const { budget, location, bedrooms, bathrooms, features, searchQuery } = parameters;
+    
+    // Build search query based on parameters
+    let query = searchQuery || '';
+    let filters = { status: 'active' };
+
+    // Add location to query and filters
+    if (location) {
+      query += location + ' ';
+      filters.location = location;
+    }
+
+    // Add features to query
+    if (features) {
+      query += features + ' ';
+    }
+
+    // Handle budget (extract numbers from various formats)
+    if (budget) {
+      let budgetNum;
+      if (typeof budget === 'string') {
+        // Remove currency symbols, commas, and spaces, then extract numbers
+        budgetNum = parseInt(budget.replace(/[$,€£¥\s]/g, ''));
+      } else {
+        budgetNum = parseInt(budget);
+      }
+      
+      if (budgetNum && budgetNum > 0) {
+        filters.price_max = budgetNum;
+        console.log('Set price max filter to:', budgetNum);
+      }
+    }
+
+    // Handle bedrooms
+    if (bedrooms) {
+      const bedroomNum = parseInt(bedrooms);
+      if (bedroomNum && bedroomNum > 0) {
+        filters.bedrooms_min = bedroomNum;
+        console.log('Set bedrooms min filter to:', bedroomNum);
+      }
+    }
+
+    // Handle bathrooms
+    if (bathrooms) {
+      const bathroomNum = parseInt(bathrooms);
+      if (bathroomNum && bathroomNum > 0) {
+        filters.bathrooms_min = bathroomNum;
+        console.log('Set bathrooms min filter to:', bathroomNum);
+      }
+    }
+
+    // If no specific query, use generic terms
+    if (!query.trim()) {
+      query = 'house property apartment';
+    }
+
+    console.log('Final buyer search query:', query);
+    console.log('Final buyer search filters:', filters);
+
+    // Search in properties collection (single search since local and TechZone are the same)
+    const searchResult = await watsonDiscovery.searchDocuments(
+      process.env.PROPERTIES_COLLECTION,
+      query,
+      filters
+    );
+
+    if (!searchResult.success) {
+      console.error('Property search failed:', searchResult.error);
+      return { success: false, error: 'Failed to search properties' };
+    }
+
+    console.log(`Found ${searchResult.data.hits.hits.length} properties`);
+
+    // Process and format the results
+    const properties = searchResult.data.hits.hits.map(hit => {
+      const source = hit._source;
+      return {
+        id: source.id,
+        title: source.title,
+        address: source.address,
+        price: `$${source.price.toLocaleString()}`,
+        bedrooms: source.bedrooms || 0,
+        bathrooms: source.bathrooms || 0,
+        sqft: source.squareFootage || 0,
+        features: source.features || [],
+        description: source.description,
+        image: source.image || 'https://via.placeholder.com/300x200',
+        score: hit._score,
+        source: 'local' // All properties are from the same source
+      };
+    });
+
+    // Sort by relevance score and limit to top 8
+    const sortedProperties = properties
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 8);
+
+    console.log(`Returning ${sortedProperties.length} properties to buyer`);
+
+    return {
+      success: true,
+      properties: sortedProperties,
+      total: sortedProperties.length,
+      searchQuery: query,
+      filters
+    };
+
+  } catch (error) {
+    console.error('Buyer property search action error:', error);
+    return { success: false, error: error.message };
+  }
+}
 
 // Helper function to handle property search action
 async function handlePropertySearch(parameters, user) {
@@ -396,4 +582,112 @@ async function handleCreateListing(parameters, user) {
   }
 }
 
+// Test endpoint to manually trigger property search (for debugging)
+router.post('/test-search', verifyToken, async (req, res) => {
+  try {
+    const { query, filters = {} } = req.body;
+    
+    console.log('Test search called:', { query, filters, user_role: req.user.role });
+    
+    if (req.user.role !== 'buyer') {
+      return res.status(403).json({ error: 'Only buyers can search properties' });
+    }
+    
+    // Test search parameters
+    const testParams = {
+      budget: filters.price_max || 500000,
+      location: filters.location || 'Dallas',
+      bedrooms: filters.bedrooms_min || 3,
+      bathrooms: filters.bathrooms_min || 2,
+      searchQuery: query || 'house',
+      features: filters.features || []
+    };
+    
+    console.log('Test search parameters:', testParams);
+    
+    const searchResult = await handleBuyerPropertySearch(testParams, req.user);
+    
+    res.json({
+      success: true,
+      searchResult,
+      testParams
+    });
+    
+  } catch (error) {
+    console.error('Test search error:', error);
+    res.status(500).json({ error: 'Test search failed', details: error.message });
+  }
+});
+
+// Simple test endpoint (no auth required for debugging)
+router.get('/test-search-simple', async (req, res) => {
+  try {
+    console.log('Simple test search called');
+    
+    // Test search in properties collection
+    const searchResult = await watsonDiscovery.searchDocuments(
+      process.env.PROPERTIES_COLLECTION,
+      'house',
+      { status: 'active' }
+    );
+    
+    res.json({
+      success: true,
+      searchTest: {
+        success: searchResult.success,
+        count: searchResult.success ? searchResult.data.hits.hits.length : 0,
+        error: searchResult.success ? null : searchResult.error
+      }
+    });
+    
+  } catch (error) {
+    console.error('Simple test search error:', error);
+    res.status(500).json({ error: 'Test search failed', details: error.message });
+  }
+});
+
+// Debug endpoint to check properties in database
+router.get('/debug/properties', verifyToken, async (req, res) => {
+  try {
+    console.log('Debug properties endpoint called');
+    
+    // Get all properties from database
+    const localResult = await watsonDiscovery.getAllDocuments(
+      process.env.PROPERTIES_COLLECTION,
+      1,
+      10
+    );
+    
+    console.log('Properties result:', localResult);
+    
+    // Test search functionality
+    const searchResult = await watsonDiscovery.searchDocuments(
+      process.env.PROPERTIES_COLLECTION,
+      'house',
+      { status: 'active' }
+    );
+    
+    console.log('Search test result:', searchResult);
+    
+    res.json({
+      success: true,
+      totalProperties: localResult.success ? localResult.data.hits.hits.length : 0,
+      searchTest: searchResult.success ? searchResult.data.hits.hits.length : 0,
+      localResult: localResult.success ? 'Success' : localResult.error,
+      searchResult: searchResult.success ? 'Success' : searchResult.error,
+      sampleProperties: localResult.success ? localResult.data.hits.hits.slice(0, 3).map(hit => ({
+        id: hit._source.id,
+        title: hit._source.title,
+        price: hit._source.price
+      })) : []
+    });
+    
+  } catch (error) {
+    console.error('Debug properties error:', error);
+    res.status(500).json({ error: 'Debug failed', details: error.message });
+  }
+});
+
 module.exports = router;
+
+
