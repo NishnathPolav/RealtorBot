@@ -24,6 +24,18 @@ import AccordionDetails from '@mui/material/AccordionDetails';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import ClearIcon from '@mui/icons-material/Clear';
+import Container from '@mui/material/Container';
+import Paper from '@mui/material/Paper';
+import Grid from '@mui/material/Grid';
+import HomeIcon from '@mui/icons-material/Home';
+import SearchIcon from '@mui/icons-material/Search';
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
+import LocationOnIcon from '@mui/icons-material/LocationOn';
+import BedIcon from '@mui/icons-material/Bed';
+import BathtubIcon from '@mui/icons-material/Bathtub';
+import SquareFootIcon from '@mui/icons-material/SquareFoot';
+import CircularProgress from '@mui/material/CircularProgress';
 
 const BuyerDashboard = () => {
   const navigate = useNavigate();
@@ -219,8 +231,24 @@ const BuyerDashboard = () => {
 
   if (toursLoading || listingsLoading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-        <Typography>Loading your dashboard...</Typography>
+      <Box 
+        display="flex" 
+        justifyContent="center" 
+        alignItems="center" 
+        minHeight="400px"
+        sx={{ 
+          background: 'var(--background-primary)',
+          borderRadius: 'var(--radius-lg)',
+          boxShadow: 'var(--shadow-sm)',
+          p: 4
+        }}
+      >
+        <Box sx={{ textAlign: 'center' }}>
+          <CircularProgress sx={{ color: 'var(--primary-color)', mb: 2 }} />
+          <Typography variant="h6" color="var(--text-secondary)">
+            Loading your dashboard...
+          </Typography>
+        </Box>
       </Box>
     );
   }
@@ -228,288 +256,589 @@ const BuyerDashboard = () => {
   // If chat is open, show only the chat interface
   if (showChat) {
     return (
-      <Box>
-        <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="h4">AI Property Assistant</Typography>
-          <Button variant="outlined" onClick={handleToggleChat}>
-            Back to Dashboard
-          </Button>
-        </Box>
-        <Chat onClose={() => setShowChat(false)} />
-      </Box>
+      <Container maxWidth="lg">
+        <Paper 
+          sx={{ 
+            p: 3, 
+            mb: 3, 
+            borderRadius: 'var(--radius-lg)',
+            boxShadow: 'var(--shadow-md)'
+          }}
+        >
+          <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h4" sx={{ color: 'var(--primary-color)', fontWeight: 600 }}>
+              AI Property Assistant
+            </Typography>
+            <Button 
+              variant="outlined" 
+              onClick={handleToggleChat}
+              sx={{
+                borderColor: 'var(--primary-color)',
+                color: 'var(--primary-color)',
+                '&:hover': {
+                  borderColor: 'var(--primary-dark)',
+                  background: 'rgba(37, 99, 235, 0.1)',
+                }
+              }}
+            >
+              Back to Dashboard
+            </Button>
+          </Box>
+          <Chat onClose={() => setShowChat(false)} />
+        </Paper>
+      </Container>
     );
   }
 
   return (
-    <Box>
-      <Typography variant="h4" gutterBottom>
-        Buyer Dashboard
-      </Typography>
-      
-      {user && (
-        <Typography variant="subtitle1" color="text.secondary" gutterBottom>
-          Welcome back, {user.email}
-        </Typography>
-      )}
+    <Container maxWidth="lg" sx={{ py: 3 }}>
+      {/* Header Section */}
+      <Paper 
+        sx={{ 
+          p: 4, 
+          mb: 4, 
+          borderRadius: 'var(--radius-xl)',
+          background: 'var(--gradient-primary)',
+          color: 'white',
+          position: 'relative',
+          overflow: 'hidden'
+        }}
+      >
+        <Box sx={{ position: 'relative', zIndex: 2 }}>
+          <Typography 
+            variant="h3" 
+            sx={{ 
+              fontWeight: 700,
+              mb: 1,
+              textShadow: '0 2px 4px rgba(0,0,0,0.1)'
+            }}
+          >
+            Buyer Dashboard
+          </Typography>
+          
+          {user && (
+            <Typography variant="h6" sx={{ opacity: 0.9, fontWeight: 300, mb: 3 }}>
+              Welcome back, {user.email}
+            </Typography>
+          )}
 
-      <Box sx={{ mb: 3 }}>
-        <Button variant="contained" color="secondary" onClick={handleToggleChat} sx={{ mr: 2 }}>
-          AI Property Assistant
-        </Button>
-        <Button variant="outlined" onClick={() => navigate('/add-edit-tour')}>
-          Schedule Tour
-        </Button>
-      </Box>
+          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+            <Button 
+              variant="contained" 
+              onClick={handleToggleChat}
+              startIcon={<SearchIcon />}
+              sx={{ 
+                bgcolor: 'white',
+                color: 'var(--primary-color)',
+                px: 3,
+                py: 1.5,
+                fontWeight: 600,
+                borderRadius: 'var(--radius-lg)',
+                boxShadow: 'var(--shadow-lg)',
+                '&:hover': {
+                  bgcolor: 'var(--background-tertiary)',
+                  transform: 'translateY(-2px)',
+                  boxShadow: 'var(--shadow-xl)',
+                }
+              }}
+            >
+              AI Property Assistant
+            </Button>
+          </Box>
+        </Box>
+        
+        {/* Background Pattern */}
+        <Box
+          sx={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            opacity: 0.1,
+            backgroundImage: 'radial-gradient(circle at 25% 25%, white 2px, transparent 2px), radial-gradient(circle at 75% 75%, white 2px, transparent 2px)',
+            backgroundSize: '50px 50px',
+            zIndex: 1
+          }}
+        />
+      </Paper>
 
       {/* Filters Section */}
-      <Accordion sx={{ mb: 3 }}>
-        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <FilterListIcon />
-            <Typography variant="h6">Property Filters</Typography>
-            {hasActiveFilters && (
-              <Chip 
-                label={`${filteredListings.length} of ${listings.length}`} 
-                size="small" 
-                color="primary" 
-                sx={{ ml: 1 }}
-              />
-            )}
-          </Box>
-        </AccordionSummary>
-        <AccordionDetails>
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr' }, gap: 2 }}>
-            {/* Location Filter */}
-            <TextField
-              label="Location"
-              value={filters.location}
-              onChange={(e) => handleFilterChange('location', e.target.value)}
-              placeholder="City, State, or Address"
-              fullWidth
-              size="small"
-            />
-
-            {/* Price Range */}
-            <Box>
-              <Typography variant="body2" gutterBottom>Price Range</Typography>
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                <TextField
-                  label="Min Price"
-                  type="text" // Changed to text to allow commas
-                  value={getFormattedPrice('priceMin')}
-                  onChange={(e) => handlePriceChange('priceMin', e.target.value)}
-                  placeholder="Min"
-                  size="small"
-                  sx={{ flex: 1 }}
-                />
-                <TextField
-                  label="Max Price"
-                  type="text" // Changed to text to allow commas
-                  value={getFormattedPrice('priceMax')}
-                  onChange={(e) => handlePriceChange('priceMax', e.target.value)}
-                  placeholder="Max"
-                  size="small"
-                  sx={{ flex: 1 }}
-                />
-              </Box>
-            </Box>
-
-            {/* Bedrooms */}
-            <FormControl fullWidth size="small">
-              <InputLabel>Min Bedrooms</InputLabel>
-              <Select
-                value={filters.bedrooms}
-                onChange={(e) => handleFilterChange('bedrooms', e.target.value)}
-                label="Min Bedrooms"
-              >
-                <MenuItem value="">Any</MenuItem>
-                <MenuItem value="1">1+</MenuItem>
-                <MenuItem value="2">2+</MenuItem>
-                <MenuItem value="3">3+</MenuItem>
-                <MenuItem value="4">4+</MenuItem>
-                <MenuItem value="5">5+</MenuItem>
-              </Select>
-            </FormControl>
-
-            {/* Bathrooms */}
-            <FormControl fullWidth size="small">
-              <InputLabel>Min Bathrooms</InputLabel>
-              <Select
-                value={filters.bathrooms}
-                onChange={(e) => handleFilterChange('bathrooms', e.target.value)}
-                label="Min Bathrooms"
-              >
-                <MenuItem value="">Any</MenuItem>
-                <MenuItem value="1">1+</MenuItem>
-                <MenuItem value="2">2+</MenuItem>
-                <MenuItem value="3">3+</MenuItem>
-                <MenuItem value="4">4+</MenuItem>
-              </Select>
-            </FormControl>
-
-            {/* Property Type */}
-            <FormControl fullWidth size="small">
-              <InputLabel>Property Type</InputLabel>
-              <Select
-                value={filters.propertyType}
-                onChange={(e) => handleFilterChange('propertyType', e.target.value)}
-                label="Property Type"
-              >
-                <MenuItem value="">Any</MenuItem>
-                {getUniqueValues('propertyType').map(type => (
-                  <MenuItem key={type} value={type}>{type}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            {/* Clear Filters Button */}
-            <Box sx={{ display: 'flex', alignItems: 'end' }}>
-              <Button
-                variant="outlined"
-                startIcon={<ClearIcon />}
-                onClick={clearFilters}
-                disabled={!hasActiveFilters}
-                fullWidth
-              >
-                Clear Filters
-              </Button>
-            </Box>
-          </Box>
-        </AccordionDetails>
-      </Accordion>
-      
-      <Typography variant="h6" gutterBottom>
-        Available Listings ({filteredListings.length})
-      </Typography>
-      <List>
-        {filteredListings.length === 0 ? (
-          <ListItem>
-            <Typography variant="body1" color="text.secondary">
-              {hasActiveFilters 
-                ? 'No properties match your current filters. Try adjusting your criteria.'
-                : 'No properties available at the moment.'
+      <Paper 
+        sx={{ 
+          mb: 4, 
+          borderRadius: 'var(--radius-lg)',
+          boxShadow: 'var(--shadow-md)',
+          overflow: 'hidden'
+        }}
+      >
+        <Accordion sx={{ boxShadow: 'none' }}>
+          <AccordionSummary 
+            expandIcon={<ExpandMoreIcon />}
+            sx={{ 
+              background: 'var(--background-secondary)',
+              '&:hover': {
+                background: 'var(--background-tertiary)',
               }
-            </Typography>
-          </ListItem>
-        ) : (
-          filteredListings.map(listing => (
-            <ListItem key={listing.id} disablePadding sx={{ mb: 2 }}>
-              <Card
-                sx={{
-                  width: '100%',
-                  cursor: 'pointer',
-                  transition: 'box-shadow 0.2s, background 0.2s',
-                  '&:hover': {
-                    boxShadow: 8,
-                    background: '#f0f4ff',
-                  },
-                }}
-                elevation={3}
-                onClick={() => handleViewListing(listing.id)}
-              >
-                <CardContent>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <Box sx={{ flex: 1 }}>
-                      <Typography variant="subtitle1" gutterBottom>{listing.title}</Typography>
-                      <Typography variant="body2" color="text.secondary" gutterBottom>
-                        Address: {[listing.street, listing.city, listing.state, listing.zip].filter(Boolean).join(', ') || listing.address}
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <FilterListIcon sx={{ color: 'var(--primary-color)' }} />
+              <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                Property Filters
+              </Typography>
+              {hasActiveFilters && (
+                <Chip 
+                  label={`${filteredListings.length} of ${listings.length}`} 
+                  size="small" 
+                  color="primary" 
+                  sx={{ 
+                    ml: 1,
+                    fontWeight: 600,
+                    background: 'var(--primary-color)'
+                  }}
+                />
+              )}
+            </Box>
+          </AccordionSummary>
+          <AccordionDetails sx={{ p: 3 }}>
+            <Grid container spacing={3}>
+              {/* Location Filter */}
+              <Grid item xs={12} sm={6} md={4}>
+                <TextField
+                  label="Location"
+                  value={filters.location}
+                  onChange={(e) => handleFilterChange('location', e.target.value)}
+                  placeholder="City, State, or Address"
+                  fullWidth
+                  size="small"
+                  InputProps={{
+                    startAdornment: <LocationOnIcon sx={{ mr: 1, color: 'var(--text-light)' }} />,
+                  }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 'var(--radius-md)',
+                      '&:hover fieldset': {
+                        borderColor: 'var(--primary-light)',
+                      },
+                      '&.Mui-focused fieldset': {
+                        borderColor: 'var(--primary-color)',
+                        borderWidth: 2,
+                      },
+                    },
+                  }}
+                />
+              </Grid>
+
+              {/* Price Range */}
+              <Grid item xs={12} sm={6} md={4}>
+                <Typography variant="body2" gutterBottom sx={{ fontWeight: 500, color: 'var(--text-primary)' }}>
+                  Price Range
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <TextField
+                    label="Min Price"
+                    type="text"
+                    value={getFormattedPrice('priceMin')}
+                    onChange={(e) => handlePriceChange('priceMin', e.target.value)}
+                    placeholder="Min"
+                    size="small"
+                    sx={{ flex: 1 }}
+                    InputProps={{
+                      startAdornment: <AttachMoneyIcon sx={{ mr: 1, color: 'var(--text-light)' }} />,
+                    }}
+                  />
+                  <TextField
+                    label="Max Price"
+                    type="text"
+                    value={getFormattedPrice('priceMax')}
+                    onChange={(e) => handlePriceChange('priceMax', e.target.value)}
+                    placeholder="Max"
+                    size="small"
+                    sx={{ flex: 1 }}
+                    InputProps={{
+                      startAdornment: <AttachMoneyIcon sx={{ mr: 1, color: 'var(--text-light)' }} />,
+                    }}
+                  />
+                </Box>
+              </Grid>
+
+              {/* Bedrooms */}
+              <Grid item xs={12} sm={6} md={2}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Min Bedrooms</InputLabel>
+                  <Select
+                    value={filters.bedrooms}
+                    onChange={(e) => handleFilterChange('bedrooms', e.target.value)}
+                    label="Min Bedrooms"
+                    startAdornment={<BedIcon sx={{ mr: 1, color: 'var(--text-light)' }} />}
+                  >
+                    <MenuItem value="">Any</MenuItem>
+                    <MenuItem value="1">1+</MenuItem>
+                    <MenuItem value="2">2+</MenuItem>
+                    <MenuItem value="3">3+</MenuItem>
+                    <MenuItem value="4">4+</MenuItem>
+                    <MenuItem value="5">5+</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+
+              {/* Bathrooms */}
+              <Grid item xs={12} sm={6} md={2}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Min Bathrooms</InputLabel>
+                  <Select
+                    value={filters.bathrooms}
+                    onChange={(e) => handleFilterChange('bathrooms', e.target.value)}
+                    label="Min Bathrooms"
+                    startAdornment={<BathtubIcon sx={{ mr: 1, color: 'var(--text-light)' }} />}
+                  >
+                    <MenuItem value="">Any</MenuItem>
+                    <MenuItem value="1">1+</MenuItem>
+                    <MenuItem value="2">2+</MenuItem>
+                    <MenuItem value="3">3+</MenuItem>
+                    <MenuItem value="4">4+</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+
+              {/* Property Type */}
+              <Grid item xs={12} sm={6} md={3}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Property Type</InputLabel>
+                  <Select
+                    value={filters.propertyType}
+                    onChange={(e) => handleFilterChange('propertyType', e.target.value)}
+                    label="Property Type"
+                    startAdornment={<HomeIcon sx={{ mr: 1, color: 'var(--text-light)' }} />}
+                  >
+                    <MenuItem value="">Any</MenuItem>
+                    {getUniqueValues('propertyType').map(type => (
+                      <MenuItem key={type} value={type}>{type}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+
+              {/* Clear Filters Button */}
+              <Grid item xs={12} sm={6} md={3}>
+                <Button
+                  variant="outlined"
+                  startIcon={<ClearIcon />}
+                  onClick={clearFilters}
+                  disabled={!hasActiveFilters}
+                  fullWidth
+                  sx={{
+                    borderColor: 'var(--error-color)',
+                    color: 'var(--error-color)',
+                    '&:hover': {
+                      borderColor: 'var(--error-color)',
+                      background: 'rgba(220, 38, 38, 0.1)',
+                    },
+                    '&:disabled': {
+                      borderColor: 'var(--border-color)',
+                      color: 'var(--text-light)',
+                    }
+                  }}
+                >
+                  Clear Filters
+                </Button>
+              </Grid>
+            </Grid>
+          </AccordionDetails>
+        </Accordion>
+      </Paper>
+      
+      {/* Listings Section */}
+      <Paper 
+        sx={{ 
+          mb: 4, 
+          borderRadius: 'var(--radius-lg)',
+          boxShadow: 'var(--shadow-md)',
+          overflow: 'hidden'
+        }}
+      >
+        <Box sx={{ p: 3, background: 'var(--background-secondary)', borderBottom: '1px solid var(--border-light)' }}>
+          <Typography variant="h5" sx={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+            Available Listings ({filteredListings.length})
+          </Typography>
+        </Box>
+        
+        <Box sx={{ p: 3 }}>
+          {filteredListings.length === 0 ? (
+            <Box sx={{ textAlign: 'center', py: 4 }}>
+              <SearchIcon sx={{ fontSize: 60, color: 'var(--text-light)', mb: 2 }} />
+              <Typography variant="h6" color="var(--text-secondary)" sx={{ mb: 1 }}>
+                {hasActiveFilters 
+                  ? 'No properties match your current filters'
+                  : 'No properties available at the moment'
+                }
+              </Typography>
+              <Typography variant="body2" color="var(--text-light)">
+                {hasActiveFilters 
+                  ? 'Try adjusting your criteria or clearing some filters.'
+                  : 'Check back later for new listings.'
+                }
+              </Typography>
+            </Box>
+          ) : (
+            <Grid container spacing={3}>
+              {filteredListings.map(listing => (
+                <Grid item xs={12} md={6} lg={4} key={listing.id}>
+                  <Card
+                    sx={{
+                      height: '100%',
+                      cursor: 'pointer',
+                      borderRadius: 'var(--radius-lg)',
+                      boxShadow: 'var(--shadow-md)',
+                      border: '1px solid var(--border-light)',
+                      transition: 'all 0.3s ease',
+                      '&:hover': {
+                        transform: 'translateY(-4px)',
+                        boxShadow: 'var(--shadow-xl)',
+                        borderColor: 'var(--primary-light)',
+                      },
+                    }}
+                    onClick={() => handleViewListing(listing.id)}
+                  >
+                    <CardContent sx={{ p: 3 }}>
+                      <Typography 
+                        variant="h6" 
+                        sx={{ 
+                          mb: 2, 
+                          fontWeight: 600,
+                          color: 'var(--text-primary)',
+                          lineHeight: 1.3
+                        }}
+                      >
+                        {listing.title}
                       </Typography>
-                      <Typography variant="h6" color="primary" gutterBottom>
+                      
+                      <Box sx={{ mb: 2 }}>
+                        <Typography 
+                          variant="body2" 
+                          color="var(--text-secondary)" 
+                          sx={{ mb: 1, display: 'flex', alignItems: 'center' }}
+                        >
+                          <LocationOnIcon sx={{ fontSize: 16, mr: 0.5, color: 'var(--text-light)' }} />
+                          {[listing.street, listing.city, listing.state, listing.zip].filter(Boolean).join(', ') || listing.address}
+                        </Typography>
+                      </Box>
+                      
+                      <Typography 
+                        variant="h5" 
+                        sx={{ 
+                          mb: 2,
+                          color: 'var(--primary-color)',
+                          fontWeight: 700
+                        }}
+                      >
                         ${listing.price?.toLocaleString()}
                       </Typography>
-                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                      
+                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
                         {listing.bedrooms && (
-                          <Chip label={`${listing.bedrooms} bed`} size="small" variant="outlined" />
+                          <Chip 
+                            icon={<BedIcon />}
+                            label={`${listing.bedrooms} bed`} 
+                            size="small" 
+                            variant="outlined"
+                            sx={{ 
+                              borderColor: 'var(--primary-light)',
+                              color: 'var(--primary-color)',
+                              fontWeight: 500
+                            }}
+                          />
                         )}
                         {listing.bathrooms && (
-                          <Chip label={`${listing.bathrooms} bath`} size="small" variant="outlined" />
+                          <Chip 
+                            icon={<BathtubIcon />}
+                            label={`${listing.bathrooms} bath`} 
+                            size="small" 
+                            variant="outlined"
+                            sx={{ 
+                              borderColor: 'var(--secondary-light)',
+                              color: 'var(--secondary-color)',
+                              fontWeight: 500
+                            }}
+                          />
                         )}
                         {listing.squareFootage && (
-                          <Chip label={`${listing.squareFootage.toLocaleString()} sqft`} size="small" variant="outlined" />
+                          <Chip 
+                            icon={<SquareFootIcon />}
+                            label={`${listing.squareFootage.toLocaleString()} sqft`} 
+                            size="small" 
+                            variant="outlined"
+                            sx={{ 
+                              borderColor: 'var(--accent-color)',
+                              color: 'var(--accent-color)',
+                              fontWeight: 500
+                            }}
+                          />
                         )}
                         {listing.propertyType && (
-                          <Chip label={listing.propertyType} size="small" variant="outlined" />
+                          <Chip 
+                            icon={<HomeIcon />}
+                            label={listing.propertyType} 
+                            size="small" 
+                            variant="outlined"
+                            sx={{ 
+                              borderColor: 'var(--success-color)',
+                              color: 'var(--success-color)',
+                              fontWeight: 500
+                            }}
+                          />
                         )}
                       </Box>
-                    </Box>
-                  </Box>
-                </CardContent>
-              </Card>
-            </ListItem>
-          ))
-        )}
-      </List>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+          )}
+        </Box>
+      </Paper>
       
-      <Typography variant="h6" gutterBottom sx={{ mt: 3 }}>
-        Your Scheduled Tours ({tours.length})
-      </Typography>
-      
-      {tours.length === 0 ? (
-        <Card sx={{ mb: 2 }}>
-          <CardContent>
-            <Typography variant="body1" color="text.secondary">
-              You haven't scheduled any tours yet.
-            </Typography>
-          </CardContent>
-        </Card>
-      ) : (
-        <List>
-          {tours.map(tour => (
-            <ListItem key={tour.id} disablePadding sx={{ mb: 2 }}>
-              <Card
-                sx={{
-                  width: '100%',
-                  cursor: 'pointer',
-                  transition: 'box-shadow 0.2s, background 0.2s',
-                  '&:hover': {
-                    boxShadow: 8,
-                    background: '#f0f4ff',
-                  },
-                }}
-                elevation={3}
-                onClick={() => handleViewTour(tour.id)}
-              >
-                <CardContent>
-                  <Box display="flex" justifyContent="space-between" alignItems="center">
-                    <Typography variant="subtitle1">
-                      {[tour.street, tour.city, tour.state, tour.zip].filter(Boolean).join(', ')}
-                    </Typography>
-                    <Chip 
-                      label={tour.status} 
-                      color={getStatusColor(tour.status)}
-                      size="small"
-                    />
-                  </Box>
-                  <Typography variant="body2" color="text.secondary">
-                    Date: {formatDate(tour.scheduled_date)}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Time: {tour.scheduled_time}
-                  </Typography>
-                  {tour.notes && (
-                    <Typography variant="body2" color="text.secondary">
-                      Notes: {tour.notes}
-                    </Typography>
-                  )}
-                </CardContent>
-              </Card>
-            </ListItem>
-          ))}
-        </List>
-      )}
-      
-      <Typography variant="h6" gutterBottom>
-        Offers & Negotiations
-      </Typography>
-      {/* Placeholder for offers/negotiations */}
-      <Card>
-        <CardContent>
-          <Typography variant="body2" color="text.secondary">
-            No current offers or negotiations.
+      {/* Tours Section */}
+      <Paper 
+        sx={{ 
+          mb: 4, 
+          borderRadius: 'var(--radius-lg)',
+          boxShadow: 'var(--shadow-md)',
+          overflow: 'hidden'
+        }}
+      >
+        <Box sx={{ p: 3, background: 'var(--background-secondary)', borderBottom: '1px solid var(--border-light)' }}>
+          <Typography variant="h5" sx={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+            Your Scheduled Tours ({tours.length})
           </Typography>
-        </CardContent>
-      </Card>
-    </Box>
+        </Box>
+        
+        <Box sx={{ p: 3 }}>
+          {tours.length === 0 ? (
+            <Box sx={{ textAlign: 'center', py: 4 }}>
+              <CalendarTodayIcon sx={{ fontSize: 60, color: 'var(--text-light)', mb: 2 }} />
+              <Typography variant="h6" color="var(--text-secondary)" sx={{ mb: 1 }}>
+                No tours scheduled yet
+              </Typography>
+              <Typography variant="body2" color="var(--text-light)" sx={{ mb: 2 }}>
+                Schedule a tour to see properties in person.
+              </Typography>
+              <Button 
+                variant="contained" 
+                onClick={() => navigate('/add-edit-tour')}
+                startIcon={<CalendarTodayIcon />}
+                sx={{
+                  background: 'var(--primary-color)',
+                  '&:hover': {
+                    background: 'var(--primary-dark)',
+                  }
+                }}
+              >
+                Schedule Your First Tour
+              </Button>
+            </Box>
+          ) : (
+            <Grid container spacing={3}>
+              {tours.map(tour => (
+                <Grid item xs={12} md={6} key={tour.id}>
+                  <Card
+                    sx={{
+                      height: '100%',
+                      cursor: 'pointer',
+                      borderRadius: 'var(--radius-lg)',
+                      boxShadow: 'var(--shadow-md)',
+                      border: '1px solid var(--border-light)',
+                      transition: 'all 0.3s ease',
+                      '&:hover': {
+                        transform: 'translateY(-2px)',
+                        boxShadow: 'var(--shadow-lg)',
+                        borderColor: 'var(--secondary-light)',
+                      },
+                    }}
+                    onClick={() => handleViewTour(tour.id)}
+                  >
+                    <CardContent sx={{ p: 3 }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+                        <Typography 
+                          variant="h6" 
+                          sx={{ 
+                            fontWeight: 600,
+                            color: 'var(--text-primary)',
+                            flex: 1
+                          }}
+                        >
+                          {[tour.street, tour.city, tour.state, tour.zip].filter(Boolean).join(', ')}
+                        </Typography>
+                        <Chip 
+                          label={tour.status} 
+                          color={getStatusColor(tour.status)}
+                          size="small"
+                          sx={{ fontWeight: 600 }}
+                        />
+                      </Box>
+                      
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+                        <CalendarTodayIcon sx={{ fontSize: 20, color: 'var(--text-light)' }} />
+                        <Typography variant="body2" color="var(--text-secondary)">
+                          {formatDate(tour.scheduled_date)}
+                        </Typography>
+                      </Box>
+                      
+                      <Typography variant="body2" color="var(--text-secondary)" sx={{ mb: 1 }}>
+                        Time: {tour.scheduled_time}
+                      </Typography>
+                      
+                      {tour.notes && (
+                        <Typography 
+                          variant="body2" 
+                          color="var(--text-secondary)"
+                          sx={{ 
+                            mt: 2,
+                            p: 2,
+                            background: 'var(--background-tertiary)',
+                            borderRadius: 'var(--radius-md)',
+                            borderLeft: '3px solid var(--primary-color)'
+                          }}
+                        >
+                          <strong>Notes:</strong> {tour.notes}
+                        </Typography>
+                      )}
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+          )}
+        </Box>
+      </Paper>
+      
+      {/* Offers Section */}
+      <Paper 
+        sx={{ 
+          borderRadius: 'var(--radius-lg)',
+          boxShadow: 'var(--shadow-md)',
+          overflow: 'hidden'
+        }}
+      >
+        <Box sx={{ p: 3, background: 'var(--background-secondary)', borderBottom: '1px solid var(--border-light)' }}>
+          <Typography variant="h5" sx={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+            Offers & Negotiations
+          </Typography>
+        </Box>
+        <Box sx={{ p: 3 }}>
+          <Box sx={{ textAlign: 'center', py: 4 }}>
+            <AttachMoneyIcon sx={{ fontSize: 60, color: 'var(--text-light)', mb: 2 }} />
+            <Typography variant="h6" color="var(--text-secondary)" sx={{ mb: 1 }}>
+              No current offers or negotiations
+            </Typography>
+            <Typography variant="body2" color="var(--text-light)">
+              When you make an offer on a property, it will appear here.
+            </Typography>
+          </Box>
+        </Box>
+      </Paper>
+    </Container>
   );
 };
 
