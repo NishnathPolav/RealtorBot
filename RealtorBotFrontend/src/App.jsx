@@ -4,7 +4,6 @@ import Layout from './components/Layout';
 import LandingPage from './pages/LandingPage';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
-import ChooseMode from './pages/ChooseMode';
 import SellerDashboard from './pages/SellerDashboard';
 import AddEditListing from './pages/AddEditListing';
 import RespondOffers from './pages/RespondOffers';
@@ -29,7 +28,7 @@ const App = () => (
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
-        <Route path="/choose-mode" element={<ProtectedRoute><ChooseMode /></ProtectedRoute>} />
+        {/* ChooseMode removed - users go straight to role-specific dashboards */}
         <Route path="/seller-dashboard" element={<ProtectedRoute allowedRoles={['seller']}><SellerDashboard /></ProtectedRoute>} />
         <Route path="/add-edit-listing" element={<ProtectedRoute><AddEditListing /></ProtectedRoute>} />
         <Route path="/add-edit-listing/:id" element={<ProtectedRoute><AddEditListing /></ProtectedRoute>} />

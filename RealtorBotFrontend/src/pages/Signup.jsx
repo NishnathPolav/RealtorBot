@@ -19,7 +19,12 @@ const Signup = () => {
     e.preventDefault();
     try {
       await signup(email, password, role);
-      navigate('/choose-mode');
+      // Navigate directly to the appropriate dashboard based on selected role
+      if (role === 'seller') {
+        navigate('/seller-dashboard');
+      } else {
+        navigate('/buyer-dashboard');
+      }
     } catch (err) {
       setError('Signup failed');
     }
